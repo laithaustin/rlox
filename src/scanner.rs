@@ -1,48 +1,42 @@
-mod token;
-use token::Token;
-use token::TokenType;
+use crate::token::Token;
+use crate::token::TokenType;
 
-// use rlox::Lox::error;
+use crate::error::ErrorReporter;
 
-struct Scanner{
+pub struct Scanner<'a> {
     source: String,
-    tokens: Vec<Token>,
-    start: u32,
-    current: u32,
-    line: u32,
+    pub tokens: Vec<Token>,
+    start: usize,
+    current: usize,
+    line: usize,
+    error_reporter: &'a mut dyn ErrorReporter
 }
 
-impl Scanner {
-    fn new(source: String) -> Self {
+impl<'a> Scanner<'a> {
+    pub fn new(source: String, error_reporter: &'a mut dyn ErrorReporter) -> Self {
        Self {
             source,
             tokens: Vec::new(),
             start: 0,
             current: 0,
-            line: 1
+            line: 1,
+            error_reporter
         } 
     }
 
-    fn scan_tokens(&mut self) -> Vec<Token> {
+    pub fn scan_tokens(&mut self) {
         // process tokens one by one
-        while(!self.at_end()) {
+        while !self.at_end() {
             self.start = self.current;
             self.scan_token();
         }
 
         // append a EOF to stream
-        self.tokens.push(Token::
-            new(
-                TokenType::EOF,
-                String::from(""),
-                self.line,
-                None
-            )
-        )
+        self.tokens.push(Token::new(TokenType::EOF, String::from(""), self.line, None));
     }
 
     fn at_end(&self) -> bool {
-        return self.current > self.source.len(); 
+        return self.current >= self.source.len(); 
     }
 
     fn add_token(&mut self, token_type: TokenType) {
@@ -54,14 +48,34 @@ impl Scanner {
         self.tokens.push(Token::new(token_type, text, self.line, literal));
     }
 
+    fn advance(&mut self) -> char {
+        self.current += 1;
+        // utf8 encoded meaning chars can be more than 1 byte
+        // TODO: highly unefficient O(n) operation
+        return self.source.chars().nth(self.current - 1).unwrap();
+    }
+
+    fn check(&mut self, expected: char) -> bool {
+        if self.at_end() {
+            return false;
+        }
+
+        if self.source.chars().nth(self.current).unwrap() != expected {
+            return false;
+        }
+
+        self.current += 1;
+        return true;
+    }
+
     fn scan_token(&mut self) {
-        char c = self.advance();
+        let c = self.advance();
         match c {
             // single chars
-            '(' => self.add_token(TokenType::LEFT_PAREN),
-            ')' => self.add_token(TokenType::RIGHT_PAREN),
-            '{' => self.add_token(TokenType::LEFT_BRACE),
-            '}' => self.add_token(TokenType::RIGHT_BRACE),
+            '(' => self.add_token(TokenType::LPAREN),
+            ')' => self.add_token(TokenType::RPAREN),
+            '{' => self.add_token(TokenType::LBRACE),
+            '}' => self.add_token(TokenType::RBRACE),
             ',' => self.add_token(TokenType::COMMA),
             '.' => self.add_token(TokenType::DOT),
             '-' => self.add_token(TokenType::MINUS),
@@ -71,35 +85,35 @@ impl Scanner {
 
             // double chars
             '!' => {
-                if self.match('=') {
+                if self.check('=') {
                     self.add_token(TokenType::BANG_EQUAL);
                 } else {
                     self.add_token(TokenType::BANG);
                 }
             },
             '=' => {
-                if self.match('=') {
+                if self.check('=') {
                     self.add_token(TokenType::EQUAL_EQUAL);
                 } else {
                     self.add_token(TokenType::EQUAL);
                 }
             },
             '<' => {
-                if self.match('=') {
+                if self.check('=') {
                     self.add_token(TokenType::LESS_EQUAL);
                 } else {
                     self.add_token(TokenType::LESS);
                 }
             },
             '>' => {
-                if self.match('=') {
+                if self.check('=') {
                     self.add_token(TokenType::GREATER_EQUAL);
                 } else {
                     self.add_token(TokenType::GREATER);
                 }
             },
-            '/' => {
-                if self.match('/') {
+            /* '/' => {
+                if self.check('/') {
                     // A comment goes until the end of the line.
                     while (self.peek() != '\n' && !self.at_end()) {
                         self.advance();
@@ -107,7 +121,7 @@ impl Scanner {
                 } else {
                     self.add_token(TokenType::SLASH);
                 }
-            },
+            }, */
 
             // ignore whitespaces
             ' ' => (),
@@ -126,7 +140,7 @@ impl Scanner {
                     // Lox.error(line, "Unexpected character.");
                 } */
                 // print error message
-                main::Lox::error(self.line, "Unexpected character.");
+                self.error_reporter.error(self.line, "Unexpected character.");
             }
         }
     }

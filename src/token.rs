@@ -20,19 +20,20 @@ pub enum TokenType {
 }
 
 // Token Struct
+#[derive(Debug)]
 pub struct Token {
-    token_type: TokenType,
-    lexeme: String,
-    line: usize,
-    literal: Option<String>,
+    pub token_type: TokenType,
+    pub lexeme: String,
+    pub line: usize,
+    pub literal: Option<String>,
 }
 
 impl Token {
-    fn new(token_type: TokenType, lexeme: String, line: usize, literal: Option<String>) -> Self {
+    pub fn new(token_type: TokenType, lexeme: String, line: usize, literal: Option<String>) -> Self {
         Self { token_type, lexeme, line, literal }
     }
 
-    fn to_string(&self) -> String {
+    pub fn to_string(&self) -> String {
         format!("{:?} {} {}", self.token_type, self.lexeme, self.literal.as_ref().unwrap_or(&"".to_string()))
     }
 }
