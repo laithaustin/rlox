@@ -76,6 +76,22 @@ impl<'a> Scanner<'a> {
         return self.source.chars().nth(self.current).unwrap();
     }
 
+    fn string(&mut self) {
+        let mut s = String::new();
+        while (self.peek() != '"' && !self.at_end()) {
+           s.push(self.advance());
+        }
+
+        if self.at_end() {
+            self.error_reporter.error(self.line, "Unterminated string.");
+            return;
+        }
+
+        // push new token type with literal
+        self.advance(); // consume closing "
+        self.add_token_literal(TokenType::STRING, Some(s));
+    }
+
     fn scan_token(&mut self) {
         let c = self.advance();
         match c {
@@ -136,20 +152,22 @@ impl<'a> Scanner<'a> {
             '\r' => (),
             '\t' => (),
             '\n' => self.line += 1,
-            // '"' => self.string(),
+            '"' => self.string(),
 
             // handle numbers/identifiers
             _ => {
-                /* if c.is_digit() {
-                    self.number();
-                } else if c.is_alpha() {
-                    self.identifier();
+                if c.is_ascii_digit() {
+                    // self.number();
+                    self.error_reporter.error(self.line, "digit");
+                } else if c.is_ascii_alphabetic() {
+                    // self.identifier();
+                    self.error_reporter.error(self.line, "identifier");
+                    // TODO: handle keywords
                 } else {
-                    // Lox.error(line, "Unexpected character.");
-                } */
-                // print error message
-                self.error_reporter.error(self.line, "Unexpected character.");
+                    self.error_reporter.error(self.line, "Unexpected character.");
+                }
             }
         }
+
     }
 }
