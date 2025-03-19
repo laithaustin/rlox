@@ -68,6 +68,14 @@ impl<'a> Scanner<'a> {
         return true;
     }
 
+    fn peek(&self) -> char {
+        if self.at_end() {
+            return '\0';
+        }
+
+        return self.source.chars().nth(self.current).unwrap();
+    }
+
     fn scan_token(&mut self) {
         let c = self.advance();
         match c {
@@ -112,7 +120,7 @@ impl<'a> Scanner<'a> {
                     self.add_token(TokenType::GREATER);
                 }
             },
-            /* '/' => {
+            '/' => {
                 if self.check('/') {
                     // A comment goes until the end of the line.
                     while (self.peek() != '\n' && !self.at_end()) {
@@ -121,7 +129,7 @@ impl<'a> Scanner<'a> {
                 } else {
                     self.add_token(TokenType::SLASH);
                 }
-            }, */
+            },
 
             // ignore whitespaces
             ' ' => (),
