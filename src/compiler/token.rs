@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 // Estalish basic token types for the lexer
-#[derive(Debug)] // derive Debug trait for TokenType
+#[derive(Debug, PartialEq)]
 pub enum TokenType {
     // single char tokens
     LPAREN,
