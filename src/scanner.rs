@@ -109,6 +109,18 @@ impl<'a> Scanner<'a> {
         self.add_token_literal(TokenType::NUMBER, Some(num.to_string()));
     }
 
+    fn identifier(&mut self) {
+        while (self.peek().is_ascii_alphanumeric()) {
+            self.advance();
+        }
+
+        let text = self.source[self.start..self.current]
+            .to_string()
+            .to_lowercase();
+        let token: TokenType = text.parse().unwrap_or(TokenType::IDENTIFIER);
+        self.add_token(token);
+    }
+
     fn scan_token(&mut self) {
         let c = self.advance();
         match c {
@@ -176,8 +188,7 @@ impl<'a> Scanner<'a> {
                 if c.is_ascii_digit() {
                     self.number();
                 } else if c.is_ascii_alphabetic() {
-                    // self.identifier();
-                    // TODO: handle keywords
+                    self.identifier();
                 } else {
                     self.error_reporter
                         .error(self.line, "Unexpected character.");
