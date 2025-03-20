@@ -1,7 +1,7 @@
-use crate::token::Token;
-use crate::token::TokenType;
+use crate::compiler::token::Token;
+use crate::compiler::token::TokenType;
 
-use crate::error::ErrorReporter;
+use crate::compiler::error::ErrorReporter;
 
 pub struct Scanner<'a> {
     source: String,
@@ -84,7 +84,7 @@ impl<'a> Scanner<'a> {
 
     fn string(&mut self) {
         let mut s = String::new();
-        while (self.peek() != '"' && !self.at_end()) {
+        while self.peek() != '"' && !self.at_end() {
             s.push(self.advance());
         }
 
@@ -99,7 +99,7 @@ impl<'a> Scanner<'a> {
     }
 
     fn number(&mut self) {
-        while (self.peek().is_ascii_digit() || self.peek() == '.') {
+        while self.peek().is_ascii_digit() || self.peek() == '.' {
             self.advance();
         }
 
@@ -110,7 +110,7 @@ impl<'a> Scanner<'a> {
     }
 
     fn identifier(&mut self) {
-        while (self.peek().is_ascii_alphanumeric()) {
+        while self.peek().is_ascii_alphanumeric() {
             self.advance();
         }
 
@@ -168,7 +168,7 @@ impl<'a> Scanner<'a> {
             '/' => {
                 if self.check('/') {
                     // A comment goes until the end of the line.
-                    while (self.peek() != '\n' && !self.at_end()) {
+                    while self.peek() != '\n' && !self.at_end() {
                         self.advance();
                     }
                 } else {

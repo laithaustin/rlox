@@ -3,12 +3,9 @@ use std::{
     io::{self, BufRead, Write},
 };
 
-mod error;
-mod scanner;
-mod token;
+mod compiler;
 
-use error::ErrorReporter;
-use scanner::Scanner;
+use compiler::{ErrorReporter, Scanner};
 
 pub struct Lox {
     had_error: bool,
