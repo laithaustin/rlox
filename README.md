@@ -78,7 +78,7 @@ cargo run -- path/to/script.lox
 
 ## Language Features
 
-The implementation supports the following Lox features:
+The implementation will support the following Lox features:
 
 - Variables and assignment
 - Basic arithmetic operations
@@ -92,7 +92,7 @@ The implementation supports the following Lox features:
 
 ## Example Code
 
-Here's a simple example of Lox code that this interpreter can run:
+Here's a simple example of Lox code that this interpreter can(should**) run:
 
 ```lox
 fun fibonacci(n) {
