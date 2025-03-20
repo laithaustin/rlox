@@ -55,10 +55,9 @@ impl<'a> Scanner<'a> {
     }
 
     fn advance(&mut self) -> char {
-        self.current += 1;
-        // utf8 encoded meaning chars can be more than 1 byte
-        // TODO: highly unefficient O(n) operation
-        return self.source.chars().nth(self.current - 1).unwrap();
+        let c = self.source.chars().nth(self.current).unwrap();
+        self.current += c.len_utf8();
+        c
     }
 
     fn check(&mut self, expected: char) -> bool {
@@ -70,7 +69,7 @@ impl<'a> Scanner<'a> {
             return false;
         }
 
-        self.current += 1;
+        self.current += expected.len_utf8();
         return true;
     }
 
@@ -85,11 +84,14 @@ impl<'a> Scanner<'a> {
     fn string(&mut self) {
         let mut s = String::new();
         while self.peek() != '"' && !self.at_end() {
+            if self.peek() == '\n' {
+                self.line += 1;
+            }
             s.push(self.advance());
         }
 
         if self.at_end() {
-            self.error_reporter.error(self.line, "Unterminated string.");
+            self.error_reporter.error(self.line, "Unterminated string");
             return;
         }
 
@@ -191,7 +193,7 @@ impl<'a> Scanner<'a> {
                     self.identifier();
                 } else {
                     self.error_reporter
-                        .error(self.line, "Unexpected character.");
+                        .error(self.line, &format!("Unexpected character '{}'", c));
                 }
             }
         }
