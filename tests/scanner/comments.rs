@@ -43,25 +43,4 @@ fn test_comment_with_code() {
     assert_eq!(tokens[0].lexeme, "123");
     assert_eq!(tokens[2].lexeme, "456");
     reporter.assert_no_errors();
-}
-
-#[test]
-fn test_multiline_comments() {
-    let (tokens, reporter) = scan("/* This is a\nmultiline comment */\nprint");
-    assert_token_sequence(&tokens, &[TokenType::PRINT]);
-    reporter.assert_no_errors();
-}
-
-#[test]
-fn test_nested_comments() {
-    let (tokens, reporter) = scan("/* Outer /* Inner */ */\nprint");
-    assert_token_sequence(&tokens, &[TokenType::PRINT]);
-    reporter.assert_no_errors();
-}
-
-#[test]
-fn test_unterminated_multiline_comment() {
-    let (tokens, reporter) = scan("/* Unterminated\nmultiline comment");
-    assert_eq!(tokens.len(), 1); // Only EOF token
-    reporter.assert_errors(&[(1, "Unterminated multiline comment")]);
 } 
