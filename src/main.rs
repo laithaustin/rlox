@@ -1,11 +1,14 @@
-use std::{env, fs, io::{self, BufRead, Write}}
+use std::{
+    env, fs,
+    io::{self, BufRead, Write},
+};
 
+mod error;
 mod scanner;
 mod token;
-mod error;
 
-use scanner::Scanner;
 use error::ErrorReporter;
+use scanner::Scanner;
 
 pub struct Lox {
     had_error: bool,
@@ -27,7 +30,7 @@ impl Lox {
         scanner.scan_tokens();
         // dummy tokens for testing (need to use type annotations)
         // let tokens = vec!["(", ")", "{", "}", ",", ".", "-", "+", ";", "*", "!"];
-        
+
         for token in scanner.tokens {
             println!("{:?}", token);
         }
@@ -86,5 +89,3 @@ fn main() {
         }
     }
 }
-
-
