@@ -1,12 +1,10 @@
-use std::{env, fs, io::{self, BufRead, Write}, path::Path};
+use std::{env, fs, io::{self, BufRead, Write}}
 
 mod scanner;
 mod token;
 mod error;
 
 use scanner::Scanner;
-use token::TokenType;
-use token::Token;
 use error::ErrorReporter;
 
 pub struct Lox {
