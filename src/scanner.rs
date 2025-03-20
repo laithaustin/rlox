@@ -9,19 +9,19 @@ pub struct Scanner<'a> {
     start: usize,
     current: usize,
     line: usize,
-    error_reporter: &'a mut dyn ErrorReporter
+    error_reporter: &'a mut dyn ErrorReporter,
 }
 
 impl<'a> Scanner<'a> {
     pub fn new(source: String, error_reporter: &'a mut dyn ErrorReporter) -> Self {
-       Self {
+        Self {
             source,
             tokens: Vec::new(),
             start: 0,
             current: 0,
             line: 1,
-            error_reporter
-        } 
+            error_reporter,
+        }
     }
 
     pub fn scan_tokens(&mut self) {
@@ -32,20 +32,26 @@ impl<'a> Scanner<'a> {
         }
 
         // append a EOF to stream
-        self.tokens.push(Token::new(TokenType::EOF, String::from(""), self.line, None));
+        self.tokens.push(Token::new(
+            TokenType::EOF,
+            String::from(""),
+            self.line,
+            None,
+        ));
     }
 
     fn at_end(&self) -> bool {
-        return self.current >= self.source.len(); 
+        return self.current >= self.source.len();
     }
 
     fn add_token(&mut self, token_type: TokenType) {
-        self.add_token_literal(token_type, None);        
+        self.add_token_literal(token_type, None);
     }
 
     fn add_token_literal(&mut self, token_type: TokenType, literal: Option<String>) {
         let text = self.source[self.start..self.current].to_string();
-        self.tokens.push(Token::new(token_type, text, self.line, literal));
+        self.tokens
+            .push(Token::new(token_type, text, self.line, literal));
     }
 
     fn advance(&mut self) -> char {
@@ -79,7 +85,7 @@ impl<'a> Scanner<'a> {
     fn string(&mut self) {
         let mut s = String::new();
         while (self.peek() != '"' && !self.at_end()) {
-           s.push(self.advance());
+            s.push(self.advance());
         }
 
         if self.at_end() {
@@ -90,6 +96,17 @@ impl<'a> Scanner<'a> {
         // push new token type with literal
         self.advance(); // consume closing "
         self.add_token_literal(TokenType::STRING, Some(s));
+    }
+
+    fn number(&mut self) {
+        while (self.peek().is_ascii_digit() || self.peek() == '.') {
+            self.advance();
+        }
+
+        // parse number
+        let num_str = self.source[self.start..self.current].to_string();
+        let num: f64 = num_str.parse().unwrap();
+        self.add_token_literal(TokenType::NUMBER, Some(num.to_string()));
     }
 
     fn scan_token(&mut self) {
@@ -114,28 +131,28 @@ impl<'a> Scanner<'a> {
                 } else {
                     self.add_token(TokenType::BANG);
                 }
-            },
+            }
             '=' => {
                 if self.check('=') {
                     self.add_token(TokenType::EQUAL_EQUAL);
                 } else {
                     self.add_token(TokenType::EQUAL);
                 }
-            },
+            }
             '<' => {
                 if self.check('=') {
                     self.add_token(TokenType::LESS_EQUAL);
                 } else {
                     self.add_token(TokenType::LESS);
                 }
-            },
+            }
             '>' => {
                 if self.check('=') {
                     self.add_token(TokenType::GREATER_EQUAL);
                 } else {
                     self.add_token(TokenType::GREATER);
                 }
-            },
+            }
             '/' => {
                 if self.check('/') {
                     // A comment goes until the end of the line.
@@ -145,7 +162,7 @@ impl<'a> Scanner<'a> {
                 } else {
                     self.add_token(TokenType::SLASH);
                 }
-            },
+            }
 
             // ignore whitespaces
             ' ' => (),
@@ -157,17 +174,15 @@ impl<'a> Scanner<'a> {
             // handle numbers/identifiers
             _ => {
                 if c.is_ascii_digit() {
-                    // self.number();
-                    self.error_reporter.error(self.line, "digit");
+                    self.number();
                 } else if c.is_ascii_alphabetic() {
                     // self.identifier();
-                    self.error_reporter.error(self.line, "identifier");
                     // TODO: handle keywords
                 } else {
-                    self.error_reporter.error(self.line, "Unexpected character.");
+                    self.error_reporter
+                        .error(self.line, "Unexpected character.");
                 }
             }
         }
-
     }
 }
