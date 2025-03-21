@@ -81,7 +81,27 @@ impl<'a> Scanner<'a> {
         return self.source.chars().nth(self.current).unwrap();
     }
 
+    fn peek_next(&self) -> char {
+        // Safety check
+        if self.current >= self.source.len() {
+            return '\0';
+        }
+
+        // Get a direct char iterator to the current position
+        let mut char_iter = self.source[self.current..].chars();
+        
+        // Get current character and advance the iterator to next one
+        let _ = char_iter.next();
+        
+        // Return the next character or null if there isn't one
+        match char_iter.next() {
+            Some(ch) => ch,
+            None => '\0',
+        }
+    }
+
     fn string(&mut self) {
+        self.start = self.current - 1; // Include the opening quote in lexeme
         let mut s = String::new();
         while self.peek() != '"' && !self.at_end() {
             if self.peek() == '\n' {
@@ -91,7 +111,7 @@ impl<'a> Scanner<'a> {
         }
 
         if self.at_end() {
-            self.error_reporter.error(self.line, "Unterminated string");
+            self.error_reporter.error(self.line, "Unterminated string.");
             return;
         }
 
@@ -101,8 +121,16 @@ impl<'a> Scanner<'a> {
     }
 
     fn number(&mut self) {
-        while self.peek().is_ascii_digit() || self.peek() == '.' {
+        while self.peek().is_ascii_digit() {
             self.advance();
+        }
+
+        // Look for decimal part
+        if self.peek() == '.' && self.peek_next().is_ascii_digit() {
+            self.advance(); // consume the dot
+            while self.peek().is_ascii_digit() {
+                self.advance();
+            }
         }
 
         // parse number
@@ -116,10 +144,9 @@ impl<'a> Scanner<'a> {
             self.advance();
         }
 
-        let text = self.source[self.start..self.current]
-            .to_string()
-            .to_lowercase();
-        let token: TokenType = text.parse().unwrap_or(TokenType::IDENTIFIER);
+        let text = self.source[self.start..self.current].to_string();
+        let lowercase_text = text.to_lowercase();
+        let token: TokenType = lowercase_text.parse().unwrap_or(TokenType::IDENTIFIER);
         self.add_token(token);
     }
 
@@ -172,6 +199,28 @@ impl<'a> Scanner<'a> {
                     // A comment goes until the end of the line.
                     while self.peek() != '\n' && !self.at_end() {
                         self.advance();
+                    }
+                } else if self.check('*') {
+                    // Multiline comment
+                    let mut nesting = 1;
+                    while nesting > 0 && !self.at_end() {
+                        if self.peek() == '*' && self.peek_next() == '/' {
+                            nesting -= 1;
+                            self.advance(); // consume *
+                            self.advance(); // consume /
+                        } else if self.peek() == '/' && self.peek_next() == '*' {
+                            nesting += 1;
+                            self.advance(); // consume /
+                            self.advance(); // consume *
+                        } else {
+                            if self.peek() == '\n' {
+                                self.line += 1;
+                            }
+                            self.advance();
+                        }
+                    }
+                    if nesting > 0 {
+                        self.error_reporter.error(self.line, "Unterminated multiline comment");
                     }
                 } else {
                     self.add_token(TokenType::SLASH);
