@@ -55,6 +55,24 @@ fn test_string_with_escapes() {
 }
 
 #[test]
+fn test_string_with_newlines() {
+    let (tokens, reporter) = scan("\"hello\nworld\"");
+    assert_token_sequence(&tokens, &[TokenType::STRING]);
+    assert_eq!(tokens[0].lexeme, "\"hello\nworld\"");
+    assert_eq!(tokens[0].line, 2); // Line count increases with newlines in strings
+    reporter.assert_no_errors();
+}
+
+#[test]
+fn test_string_with_multiple_newlines() {
+    let (tokens, reporter) = scan("\"hello\n\nworld\n\"");
+    assert_token_sequence(&tokens, &[TokenType::STRING]);
+    assert_eq!(tokens[0].lexeme, "\"hello\n\nworld\n\"");
+    assert_eq!(tokens[0].line, 4); // Line count increases with each newline
+    reporter.assert_no_errors();
+}
+
+#[test]
 fn test_mixed_literals() {
     let (tokens, reporter) = scan("123 \"hello\" 456.789 \"world\"");
     assert_token_sequence(&tokens, &[
@@ -86,7 +104,7 @@ fn test_literals_with_operators() {
 #[test]
 fn test_multiple_lines() {
     let (tokens, reporter) = scan("print\n\"hello\"\n123");
-    assert_eq!(tokens.len(), 3);
+    assert_eq!(tokens.len() - 1, 3);
     assert_eq!(tokens[0].line, 1);
     assert_eq!(tokens[1].line, 2);
     assert_eq!(tokens[2].line, 3);

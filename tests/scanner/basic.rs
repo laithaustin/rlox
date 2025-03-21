@@ -67,6 +67,46 @@ fn test_mixed_operators() {
 }
 
 #[test]
+fn test_equal_operators_individually() {
+    let (tokens, reporter) = scan("= ==");
+    assert_token_sequence(&tokens, &[
+        TokenType::EQUAL,
+        TokenType::EQUAL_EQUAL,
+    ]);
+    reporter.assert_no_errors();
+}
+
+#[test]
+fn test_less_operators_individually() {
+    let (tokens, reporter) = scan("< <=");
+    assert_token_sequence(&tokens, &[
+        TokenType::LESS,
+        TokenType::LESS_EQUAL,
+    ]);
+    reporter.assert_no_errors();
+}
+
+#[test]
+fn test_greater_operators_individually() {
+    let (tokens, reporter) = scan("> >=");
+    assert_token_sequence(&tokens, &[
+        TokenType::GREATER,
+        TokenType::GREATER_EQUAL,
+    ]);
+    reporter.assert_no_errors();
+}
+
+#[test]
+fn test_bang_operators_individually() {
+    let (tokens, reporter) = scan("! !=");
+    assert_token_sequence(&tokens, &[
+        TokenType::BANG,
+        TokenType::BANG_EQUAL,
+    ]);
+    reporter.assert_no_errors();
+}
+
+#[test]
 fn test_line_tracking() {
     let (tokens, reporter) = scan("(\n)\n{\n}");
     assert_eq!(tokens.len(), 5); // 4 tokens + EOF

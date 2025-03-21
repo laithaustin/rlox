@@ -27,7 +27,7 @@ fn assert_token(token: &Token, expected_type: TokenType, expected_lexeme: &str, 
 
 // Helper function to assert token sequence
 fn assert_token_sequence(tokens: &[Token], expected_types: &[TokenType]) {
-    assert_eq!(tokens.len(), expected_types.len() + 1); // +1 for EOF
+    assert_eq!(tokens.len() - 1, expected_types.len(), "Token count mismatch (excluding EOF)");
     for (i, expected_type) in expected_types.iter().enumerate() {
         assert_eq!(tokens[i].token_type, *expected_type);
     }

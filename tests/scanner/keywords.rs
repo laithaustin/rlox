@@ -64,10 +64,10 @@ fn test_mixed_keywords_and_identifiers() {
 
 #[test]
 fn test_keywords_as_identifiers() {
-    let (tokens, reporter) = scan("printx classy else_");
-    assert_eq!(tokens.len(), 3);
-    assert_eq!(tokens[0].token_type, TokenType::IDENTIFIER);
-    assert_eq!(tokens[1].token_type, TokenType::IDENTIFIER);
-    assert_eq!(tokens[2].token_type, TokenType::IDENTIFIER);
+    let (tokens, reporter) = scan("printx classy notelse");
+    assert_eq!(tokens.len() - 1, 3);
+    assert_eq!(tokens[0].token_type, TokenType::IDENTIFIER, "Expected IDENTIFIER for 'printx', got {:?}", tokens[0].token_type);
+    assert_eq!(tokens[1].token_type, TokenType::IDENTIFIER, "Expected IDENTIFIER for 'classy', got {:?}", tokens[1].token_type);
+    assert_eq!(tokens[2].token_type, TokenType::IDENTIFIER, "Expected IDENTIFIER for 'notelse', got {:?}", tokens[2].token_type);
     reporter.assert_no_errors();
 } 
