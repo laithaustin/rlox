@@ -5,7 +5,7 @@ use std::{
 
 mod compiler;
 
-use compiler::{ErrorReporter, Scanner};
+use compiler::{ErrorReporter, Parser, Scanner};
 
 pub struct Lox {
     had_error: bool,
@@ -23,14 +23,19 @@ impl Lox {
     }
 
     fn run(&mut self, source: String) {
+        // first phase: tokenize the input
         let mut scanner = Scanner::new(source, self);
         scanner.scan_tokens();
         // dummy tokens for testing (need to use type annotations)
         // let tokens = vec!["(", ")", "{", "}", ",", ".", "-", "+", ";", "*", "!"];
 
-        for token in scanner.tokens {
+        for token in &scanner.tokens {
             println!("{:?}", token);
         }
+
+        // second phase: parse the tokens
+        let mut parser = Parser::new(&scanner.tokens, self);
+        parser.parse();
     }
 
     fn run_prompt(&mut self) {
