@@ -1,6 +1,6 @@
 # rlox - A Rust Implementation of Lox
 
-This is a Rust implementation of the Lox programming language. The project will implement a complete interpreter for the Lox language, including lexing, parsing, and interpretation.
+This is a Rust implementation of the Lox programming language. The project will implement a complete interpreter for the Lox language, including lexing, parsing, and interpretation. Also this project is officially my first time using the language--so there's bound to be loads of inefficiencies and room for improvement!
 
 ## Overview
 
