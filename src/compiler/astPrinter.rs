@@ -10,20 +10,20 @@ fn visit_unary(&self, unary: &Unary) -> T;
 use crate::compiler::expr::ExprVisitor;
 use crate::compiler::expr::{Binary, Grouping, Literal, Unary};
 
-struct AstPrinter;
+pub struct AstPrinter;
 
 impl ExprVisitor<String> for AstPrinter {
     fn visit_binary(&self, binary: &Binary) -> String {
         format!(
             "({:?} {:?} {:?})",
             binary.operator.lexeme,
-            binary.left.accept_visitor(self),
-            binary.right.accept_visitor(self)
+            binary.left.accept(self),
+            binary.right.accept(self)
         )
     }
 
     fn visit_grouping(&self, grouping: &Grouping) -> String {
-        format!("(group {:?})", grouping.expression.accept_visitor(self))
+        format!("(group {:?})", grouping.expression.accept(self))
     }
 
     fn visit_literal(&self, literal: &Literal) -> String {
@@ -34,7 +34,7 @@ impl ExprVisitor<String> for AstPrinter {
         format!(
             "({:?} {:?})",
             unary.operator.lexeme,
-            unary.right.accept_visitor(self)
+            unary.right.accept(self)
         )
     }
 }

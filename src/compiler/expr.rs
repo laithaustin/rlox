@@ -9,11 +9,27 @@ pub enum Object {
     String(String),
 }
 
-// This trait will be used for the trait object
-pub trait Expr {
-    fn accept_visitor<T>(&self, visitor: &dyn ExprVisitor<T>) -> T;
+// Enum-based AST representation
+#[derive(Debug, Clone)]
+pub enum Expr {
+    Binary(Box<Binary>),
+    Grouping(Box<Grouping>),
+    Literal(Literal),
+    Unary(Box<Unary>),
 }
 
+impl Expr {
+    pub fn accept<T>(&self, visitor: &dyn ExprVisitor<T>) -> T {
+        match self {
+            Expr::Binary(b)   => visitor.visit_binary(b),
+            Expr::Grouping(g) => visitor.visit_grouping(g),
+            Expr::Literal(l)  => visitor.visit_literal(l),
+            Expr::Unary(u)    => visitor.visit_unary(u),
+        }
+    }
+}
+
+// This trait will be used for the trait object
 pub trait ExprVisitor<T> {
     fn visit_binary(&self, binary: &Binary) -> T;
     fn visit_grouping(&self, grouping: &Grouping) -> T;
@@ -21,69 +37,25 @@ pub trait ExprVisitor<T> {
     fn visit_unary(&self, unary: &Unary) -> T;
 }
 
+#[derive(Debug, Clone)]
 pub struct Binary {
-    pub left: Box<dyn Expr>,
+    pub left: Box<Expr>,
     pub operator: Token,
-    pub right: Box<dyn Expr>,
+    pub right: Box<Expr>,
 }
 
-impl Binary {
-    pub fn accept<T>(&self, visitor: &dyn ExprVisitor<T>) -> T {
-        visitor.visit_binary(self)
-    }
-}
-
+#[derive(Debug, Clone)]
 pub struct Grouping {
-    pub expression: Box<dyn Expr>,
+    pub expression: Box<Expr>,
 }
 
-impl Grouping {
-    pub fn accept<T>(&self, visitor: &dyn ExprVisitor<T>) -> T {
-        visitor.visit_grouping(self)
-    }
-}
-
+#[derive(Debug, Clone)]
 pub struct Literal {
     pub value: Object,
 }
 
-impl Literal {
-    pub fn accept<T>(&self, visitor: &dyn ExprVisitor<T>) -> T {
-        visitor.visit_literal(&self)
-    }
-}
-
+#[derive(Debug, Clone)]
 pub struct Unary {
     pub operator: Token,
-    pub right: Box<dyn Expr>,
-}
-
-impl Unary {
-    pub fn accept<T>(&self, visitor: &dyn ExprVisitor<T>) -> T {
-        visitor.visit_unary(self)
-    }
-}
-
-impl Expr for Binary {
-    fn accept_visitor<T>(&self, visitor: &dyn ExprVisitor<T>) -> T {
-        self.accept(visitor)
-    }
-}
-
-impl Expr for Grouping {
-    fn accept_visitor<T>(&self, visitor: &dyn ExprVisitor<T>) -> T {
-        self.accept(visitor)
-    }
-}
-
-impl Expr for Literal {
-    fn accept_visitor<T>(&self, visitor: &dyn ExprVisitor<T>) -> T {
-        self.accept(visitor)
-    }
-}
-
-impl Expr for Unary {
-    fn accept_visitor<T>(&self, visitor: &dyn ExprVisitor<T>) -> T {
-        self.accept(visitor)
-    }
+    pub right: Box<Expr>,
 }

@@ -1,3 +1,4 @@
+use crate::compiler::astPrinter::AstPrinter;
 use crate::compiler::expr::{Binary, Expr, Grouping, Literal, Object, Unary};
 use crate::compiler::token::TokenType;
 use crate::compiler::{ErrorReporter, Scanner, Token};
@@ -12,13 +13,13 @@ use crate::compiler::{ErrorReporter, Scanner, Token};
 // primary -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" ;
 
 pub struct Parser<'a> {
-    tokens: Vec<Token>,
+    tokens: &'a Vec<Token>,
     current: usize,
     error_reporter: &'a mut dyn ErrorReporter,
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(tokens: Vec<Token>, error_reporter: &'a mut dyn ErrorReporter) -> Self {
+    pub fn new(tokens: &'a Vec<Token>, error_reporter: &'a mut dyn ErrorReporter) -> Self {
         Self {
             tokens,
             current: 0,
@@ -73,30 +74,31 @@ impl<'a> Parser<'a> {
     }
 
     // implementing the grammar rules as methods
-    pub fn expression(&mut self) -> Result<Box<dyn Expr + 'static>, ()> {
+    pub fn expression(&mut self) -> Result<Expr, ()> {
         self.equality()
     }
 
-    pub fn equality(&mut self) -> Result<Box<dyn Expr + 'static>, ()> {
+    pub fn equality(&mut self) -> Result<Expr, ()> {
         // Implementation for equality parsing will go here
-        let mut expr: Box<dyn Expr + 'static> = self.comparison()?;
+        let mut expr: Expr = self.comparison()?;
         while self.match_token(&[TokenType::BANG_EQUAL, TokenType::EQUAL_EQUAL]) {
             let operator: Token = self.advance().unwrap().clone();
             let right = self.comparison()?;
-            // Create a Binary expression node
-            expr = Box::new(Binary {
-                left: expr,
+            // Create a Binary expression node wrapped in Expr enum
+            expr = Expr::Binary(Box::new(Binary {
+                left: Box::new(expr), // Box the left expression
                 operator,
-                right,
-            });
+                right: Box::new(right), // Box the right expression
+            }));
         }
 
         Ok(expr)
     }
 
-    pub fn comparison(&mut self) -> Result<Box<dyn Expr + 'static>, ()> {
+    pub fn comparison(&mut self) -> Result<Expr, ()> {
         // let's just return some dummy value for now
-        let expr: Box<dyn Expr + 'static> = Box::new(Literal {
+        // Construct Literal and wrap in Expr enum
+        let expr: Expr = Expr::Literal(Literal {
             value: Object::Number(0.0),
         });
         return Ok(expr);
@@ -104,12 +106,16 @@ impl<'a> Parser<'a> {
 
     pub fn parse(&mut self) -> Result<(), ()> {
         // Parser implementation will go here
-        let result: Result<Box<dyn Expr + 'static>, ()> = self.expression();
+        let result: Result<Expr, ()> = self.expression(); // Changed type annotation
         match result {
             Ok(expr) => {
                 // Successfully parsed the expression
-                println!("Parsed expression successfully.");
+                println!("Parsed expression successfully: {:?}", expr); // Added debug print
                 // let's print the parsed expression for now
+                let mut printer = AstPrinter;
+                // get the type of the expression
+                let printed: String = expr.accept(&printer); // Assuming accept method is
+                println!("Printed expression: {}", printed); // Added debug print
             }
             Err(_) => {
                 // Handle parsing error
