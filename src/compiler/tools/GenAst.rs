@@ -12,14 +12,68 @@ fn define_ast(output_dir: &str, base_name: &str, types: &[&str]) {
     let mut writer = BufWriter::new(file);
 
     // in java we would define a abstract class for expr but in rust we can use traits
-    // we also need the equivalent of printwriter in rust, which is std::fs::File
     writeln!(writer, "trait {} {{", base_name).expect("Unable to write to file");
+    // TODO: add accept method for visitor pattern here
+    writeln!(
+        writer,
+        "\tfn accept<T>(&self, visitor: &dyn {}Visitor<T>) -> T;",
+        base_name
+    )
+    .expect("Unable to write to file");
     writeln!(writer, "}}\n").expect("Unable to write to file");
+
+    define_visitor(&mut writer, base_name, types);
 
     // now we need to define each of the structs/types
     for type_ref in types {
         define_type(&mut writer, base_name, type_ref);
+        // TODO:: now we can generate the impl blocks for each of the types
     }
+
+    // now we need to generate the impl blocks for each of the types
+    impl_blocks(&mut writer, base_name, types);
+}
+
+fn impl_blocks(writer: &mut BufWriter<File>, base_name: &str, types: &[&str]) {
+    // impl base_name for type {}
+    for type_ref in types {
+        let parts: Vec<&str> = type_ref.split(':').collect();
+        let struct_name = parts[0].trim(); // get struct name without whitespace
+        writeln!(writer, "impl {} for {} {{", base_name, struct_name)
+            .expect("Unable to write to file");
+        writeln!(
+            writer,
+            "    fn accept<T>(&self, visitor: &dyn {}Visitor<T>) -> T {{",
+            base_name
+        )
+        .expect("Unable to write to file");
+        writeln!(
+            writer,
+            "        visitor.visit_{}(self)",
+            struct_name.to_lowercase()
+        )
+        .expect("Unable to write to file");
+        writeln!(writer, "    }}").expect("Unable to write to file");
+        writeln!(writer, "}}\n").expect("Unable to write to file");
+    }
+}
+
+fn define_visitor(writer: &mut BufWriter<File>, base_name: &str, types: &[&str]) {
+    // we need to define a visitor trait for each of the types
+    writeln!(writer, "trait {}Visitor<T> {{", base_name).expect("Unable to write to file");
+    for type_ref in types {
+        let parts: Vec<&str> = type_ref.split(':').collect();
+        let struct_name = parts[0].trim(); // get struct name without whitespace
+        writeln!(
+            writer,
+            "    fn visit_{}(&self, {}: &{});",
+            struct_name.to_lowercase(),
+            struct_name.to_lowercase(),
+            struct_name
+        )
+        .expect("Unable to write to file");
+    }
+    writeln!(writer, "}}\n").expect("Unable to write to file");
 }
 
 fn define_type(writer: &mut BufWriter<File>, base_name: &str, type_ref: &str) {
