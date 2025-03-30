@@ -27,6 +27,203 @@ impl<'a> Parser<'a> {
         }
     }
 
+    // implementing the grammar rules as methods
+    pub fn expression(&mut self) -> Result<Expr, ()> {
+        self.equality()
+    }
+
+    pub fn equality(&mut self) -> Result<Expr, ()> {
+        // Implementation for equality parsing will go here
+        let mut expr: Expr = self.comparison()?;
+        while self.match_token(&[TokenType::BANG_EQUAL, TokenType::EQUAL_EQUAL]) {
+            let operator: Token = self.advance().unwrap().clone();
+            let right = self.comparison()?;
+            // Create a Binary expression node wrapped in Expr enum
+            expr = Expr::Binary(Box::new(Binary {
+                left: Box::new(expr), // Box the left expression
+                operator,
+                right: Box::new(right), // Box the right expression
+            }));
+        }
+
+        Ok(expr)
+    }
+
+    pub fn comparison(&mut self) -> Result<Expr, ()> {
+        // comparison -> term ( ( ">" | ">=" | "<" | "<=" ) term )*;
+
+        // let's just return some dummy value for now
+        // Construct Literal and wrap in Expr enum
+        let mut expr: Expr = self.term()?; // Start with a term
+        //
+        while self.match_token(&[
+            TokenType::GREATER,
+            TokenType::GREATER_EQUAL,
+            TokenType::LESS,
+            TokenType::LESS_EQUAL,
+        ]) {
+            let operator: Token = self.advance().unwrap().clone(); // Get the operator token
+            let right = self.term()?; // Get the next term
+
+            // Create a Binary expression node wrapped in Expr enum
+            expr = Expr::Binary(Box::new(Binary {
+                left: Box::new(expr), // Box the left expression
+                operator,
+                right: Box::new(right), // Box the right expression
+            }));
+        }
+
+        Ok(expr) // Return the final expression
+    }
+
+    pub fn term(&mut self) -> Result<Expr, ()> {
+        // term -> factor ( ( "-" | "+" ) factor )*;
+
+        let mut expr: Expr = self.factor()?;
+        while self.match_token(&[TokenType::MINUS, TokenType::PLUS]) {
+            let operator: Token = self.advance().unwrap().clone(); // Get the operator token
+            let right = self.factor()?; // Get the next factor
+
+            // Create a Binary expression node wrapped in Expr enum
+            expr = Expr::Binary(Box::new(Binary {
+                left: Box::new(expr), // Box the left expression
+                operator,
+                right: Box::new(right), // Box the right expression
+            }));
+        }
+
+        Ok(expr) // Return the final expression
+    }
+
+    pub fn factor(&mut self) -> Result<Expr, ()> {
+        // factor -> unary ( ( "/" | "*" ) unary )*;
+
+        let mut expr: Expr = self.unary()?;
+        while self.match_token(&[TokenType::SLASH, TokenType::STAR]) {
+            let operator: Token = self.advance().unwrap().clone(); // Get the operator token
+            let right = self.unary()?; // Get the next unary expression
+
+            // Create a Binary expression node wrapped in Expr enum
+            expr = Expr::Binary(Box::new(Binary {
+                left: Box::new(expr), // Box the left expression
+                operator,
+                right: Box::new(right), // Box the right expression
+            }));
+        }
+
+        Ok(expr)
+    }
+
+    pub fn unary(&mut self) -> Result<Expr, ()> {
+        // unary -> ( "!" | "-" ) unary | primary;
+
+        if self.match_token(&[TokenType::BANG, TokenType::MINUS]) {
+            let operator: Token = self.advance().unwrap().clone(); // Get the operator token
+            let right = self.unary()?; // Get the next unary expression
+
+            // Create a Unary expression node wrapped in Expr enum
+            return Ok(Expr::Unary(Box::new(Unary {
+                operator,
+                right: Box::new(right), // Box the right expression
+            })));
+        }
+
+        // If not a unary operator, parse as primary
+        self.primary()
+    }
+
+    pub fn primary(&mut self) -> Result<Expr, ()> {
+        // primary -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")";
+
+        if self.match_token(&[TokenType::NUMBER, TokenType::STRING]) {
+            let token: Token = self.advance().unwrap().clone(); // Get the token
+            // Create a Literal expression node wrapped in Expr enum
+            return match token.token_type {
+                TokenType::NUMBER => {
+                    let value: f64 = token.lexeme.parse().unwrap(); // Parse the number
+                    Ok(Expr::Literal(Literal {
+                        value: Object::Number(value), // Wrap in Object::Number
+                    }))
+                }
+                TokenType::STRING => {
+                    let value: String = token.lexeme.clone(); // Clone the string
+                    Ok(Expr::Literal(Literal {
+                        value: Object::String(value), // Wrap in Object::String
+                    }))
+                }
+                _ => {
+                    // This should not happen as we already checked for NUMBER and STRING
+                    self.error_reporter
+                        .error(0, "Unexpected token type in primary");
+                    Err(()) // Error if unexpected token type
+                }
+            };
+        }
+
+        if self.match_token(&[TokenType::TRUE]) {
+            self.advance().unwrap(); // Consume the token
+            return Ok(Expr::Literal(Literal {
+                value: Object::Boolean(true), // Wrap in Object::Bool
+            }));
+        }
+
+        if self.match_token(&[TokenType::FALSE]) {
+            self.advance().unwrap(); // Consume the token
+            return Ok(Expr::Literal(Literal {
+                value: Object::Boolean(false), // Wrap in Object::Bool
+            }));
+        }
+
+        if self.match_token(&[TokenType::NIL]) {
+            self.advance().unwrap(); // Consume the token
+            return Ok(Expr::Literal(Literal {
+                value: Object::Nil, // Wrap in Object::Bool
+            }));
+        }
+
+        if self.match_token(&[TokenType::LPAREN]) {
+            self.advance().unwrap(); // Consume '('
+            let expr = self.expression()?; // Parse the inner expression
+
+            if !self.match_token(&[TokenType::RPAREN]) {
+                self.error_reporter.error(0, "Expected closing parenthesis");
+                return Err(()); // Error if no closing parenthesis
+            }
+            self.advance().unwrap(); // Consume ')'
+
+            return Ok(Expr::Grouping(Box::new(Grouping {
+                expression: Box::new(expr),
+            }))); // Grouping expression
+        }
+
+        // If none of the above, it's an error
+        self.error_reporter.error(0, "Unexpected token");
+        Err(())
+    }
+
+    pub fn parse(&mut self) -> Result<(), ()> {
+        // Parser implementation will go here
+        let result: Result<Expr, ()> = self.expression(); // Changed type annotation
+        match result {
+            Ok(expr) => {
+                // Successfully parsed the expression
+                println!("Parsed expression successfully: {:?}", expr); // Added debug print
+                // let's print the parsed expression for now
+                let mut printer = AstPrinter;
+                // get the type of the expression
+                let printed: String = expr.accept(&printer); // Assuming accept method is
+                println!("Printed expression: {}", printed); // Added debug print
+            }
+            Err(_) => {
+                // Handle parsing error
+                self.error_reporter.error(0, "Failed to parse expression");
+                return Err(());
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn match_token(&mut self, token_types: &[TokenType]) -> bool {
         for token_type in token_types {
             if self.check(token_type) {
@@ -71,59 +268,5 @@ impl<'a> Parser<'a> {
             self.error_reporter.error(0, "Unexpected end of input");
         }
         &self.tokens[self.current]
-    }
-
-    // implementing the grammar rules as methods
-    pub fn expression(&mut self) -> Result<Expr, ()> {
-        self.equality()
-    }
-
-    pub fn equality(&mut self) -> Result<Expr, ()> {
-        // Implementation for equality parsing will go here
-        let mut expr: Expr = self.comparison()?;
-        while self.match_token(&[TokenType::BANG_EQUAL, TokenType::EQUAL_EQUAL]) {
-            let operator: Token = self.advance().unwrap().clone();
-            let right = self.comparison()?;
-            // Create a Binary expression node wrapped in Expr enum
-            expr = Expr::Binary(Box::new(Binary {
-                left: Box::new(expr), // Box the left expression
-                operator,
-                right: Box::new(right), // Box the right expression
-            }));
-        }
-
-        Ok(expr)
-    }
-
-    pub fn comparison(&mut self) -> Result<Expr, ()> {
-        // let's just return some dummy value for now
-        // Construct Literal and wrap in Expr enum
-        let expr: Expr = Expr::Literal(Literal {
-            value: Object::Number(0.0),
-        });
-        return Ok(expr);
-    }
-
-    pub fn parse(&mut self) -> Result<(), ()> {
-        // Parser implementation will go here
-        let result: Result<Expr, ()> = self.expression(); // Changed type annotation
-        match result {
-            Ok(expr) => {
-                // Successfully parsed the expression
-                println!("Parsed expression successfully: {:?}", expr); // Added debug print
-                // let's print the parsed expression for now
-                let mut printer = AstPrinter;
-                // get the type of the expression
-                let printed: String = expr.accept(&printer); // Assuming accept method is
-                println!("Printed expression: {}", printed); // Added debug print
-            }
-            Err(_) => {
-                // Handle parsing error
-                self.error_reporter.error(0, "Failed to parse expression");
-                return Err(());
-            }
-        }
-
-        Ok(())
     }
 }
