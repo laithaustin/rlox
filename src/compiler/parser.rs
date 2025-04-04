@@ -1,11 +1,12 @@
 use crate::compiler::astPrinter::AstPrinter;
-use crate::compiler::expr::{Binary, Expr, Grouping, Literal, Object, Unary};
+use crate::compiler::expr::{Binary, Expr, Grouping, Literal, Object, Ternary, Unary};
 use crate::compiler::token::TokenType;
 use crate::compiler::{ErrorReporter, Scanner, Token};
 
 // The essential grammar for lox is as follows (low to high precedence):
 // expression -> equality;
-// equality -> comparison ( ( "!=" | "==" ) comparison )*;
+// equality -> ternary ( ( "!=" | "==" ) ternary)*;
+// ternary -> comparison ( ("?") expression (":") ternary)*; //NOTE: ternary operator is RIGHT
 // comparison -> term ( ( ">" | ">=" | "<" | "<=" ) term )*;
 // term -> factor ( ( "-" | "+" ) factor )*;
 // factor -> unary ( ( "/" | "*" ) unary )*;
@@ -34,15 +35,38 @@ impl<'a> Parser<'a> {
 
     pub fn equality(&mut self) -> Result<Expr, ()> {
         // Implementation for equality parsing will go here
-        let mut expr: Expr = self.comparison()?;
+        let mut expr: Expr = self.ternary()?;
         while self.match_token(&[TokenType::BANG_EQUAL, TokenType::EQUAL_EQUAL]) {
             let operator: Token = self.advance().unwrap().clone();
-            let right = self.comparison()?;
+            let right = self.ternary()?;
             // Create a Binary expression node wrapped in Expr enum
             expr = Expr::Binary(Box::new(Binary {
                 left: Box::new(expr), // Box the left expression
                 operator,
                 right: Box::new(right), // Box the right expression
+            }));
+        }
+
+        Ok(expr)
+    }
+
+    pub fn ternary(&mut self) -> Result<Expr, ()> {
+        // ternary -> comparison ( ("?") expression (":") ternary)*;
+        let mut expr: Expr = self.comparison()?;
+        while self.match_token(&[TokenType::QUEST]) {
+            let _ = self.advance(); // consume '?'  
+            let left = self.expression()?; // parse the left expression
+            // check for ':' token
+            if !self.match_token(&[TokenType::COLON]) {
+                self.error_reporter.error(0, "Expected ':' after '?'");
+                return Err(());
+            }
+            _ = self.advance(); // consume ':'
+            let right = self.ternary()?; // parse the right expression
+            expr = Expr::Ternary(Box::new(Ternary {
+                condition: Box::new(expr),
+                true_branch: Box::new(left),
+                false_branch: Box::new(right),
             }));
         }
 
@@ -206,7 +230,6 @@ impl<'a> Parser<'a> {
         let result: Result<Expr, ()> = self.expression(); // Changed type annotation
         match result {
             Ok(expr) => {
-                // Successfully parsed the expression
                 println!("Parsed expression successfully: {:?}", expr); // Added debug print
                 // let's print the parsed expression for now
                 let mut printer = AstPrinter;
@@ -247,6 +270,7 @@ impl<'a> Parser<'a> {
             return Err("Unexpected end of input".to_string());
         }
         self.current += 1;
+        // let's debug print the current token
         Ok(&self.tokens[self.current - 1])
     }
 

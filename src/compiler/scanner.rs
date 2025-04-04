@@ -89,10 +89,10 @@ impl<'a> Scanner<'a> {
 
         // Get a direct char iterator to the current position
         let mut char_iter = self.source[self.current..].chars();
-        
+
         // Get current character and advance the iterator to next one
         let _ = char_iter.next();
-        
+
         // Return the next character or null if there isn't one
         match char_iter.next() {
             Some(ch) => ch,
@@ -164,6 +164,8 @@ impl<'a> Scanner<'a> {
             '+' => self.add_token(TokenType::PLUS),
             ';' => self.add_token(TokenType::SEMICOLON),
             '*' => self.add_token(TokenType::STAR),
+            '?' => self.add_token(TokenType::QUEST),
+            ':' => self.add_token(TokenType::COLON),
 
             // double chars
             '!' => {
@@ -220,7 +222,8 @@ impl<'a> Scanner<'a> {
                         }
                     }
                     if nesting > 0 {
-                        self.error_reporter.error(self.line, "Unterminated multiline comment");
+                        self.error_reporter
+                            .error(self.line, "Unterminated multiline comment");
                     }
                 } else {
                     self.add_token(TokenType::SLASH);

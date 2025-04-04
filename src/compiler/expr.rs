@@ -16,15 +16,17 @@ pub enum Expr {
     Grouping(Box<Grouping>),
     Literal(Literal),
     Unary(Box<Unary>),
+    Ternary(Box<Ternary>),
 }
 
 impl Expr {
     pub fn accept<T>(&self, visitor: &dyn ExprVisitor<T>) -> T {
         match self {
-            Expr::Binary(b)   => visitor.visit_binary(b),
+            Expr::Binary(b) => visitor.visit_binary(b),
             Expr::Grouping(g) => visitor.visit_grouping(g),
-            Expr::Literal(l)  => visitor.visit_literal(l),
-            Expr::Unary(u)    => visitor.visit_unary(u),
+            Expr::Literal(l) => visitor.visit_literal(l),
+            Expr::Unary(u) => visitor.visit_unary(u),
+            Expr::Ternary(t) => visitor.visit_ternary(t),
         }
     }
 }
@@ -35,6 +37,7 @@ pub trait ExprVisitor<T> {
     fn visit_grouping(&self, grouping: &Grouping) -> T;
     fn visit_literal(&self, literal: &Literal) -> T;
     fn visit_unary(&self, unary: &Unary) -> T;
+    fn visit_ternary(&self, ternary: &Ternary) -> T;
 }
 
 #[derive(Debug, Clone)]
@@ -58,4 +61,11 @@ pub struct Literal {
 pub struct Unary {
     pub operator: Token,
     pub right: Box<Expr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Ternary {
+    pub condition: Box<Expr>,
+    pub true_branch: Box<Expr>,
+    pub false_branch: Box<Expr>,
 }

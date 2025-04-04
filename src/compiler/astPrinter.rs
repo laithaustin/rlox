@@ -8,7 +8,7 @@ fn visit_unary(&self, unary: &Unary) -> T;
 } */
 
 use crate::compiler::expr::ExprVisitor;
-use crate::compiler::expr::{Binary, Grouping, Literal, Unary};
+use crate::compiler::expr::{Binary, Grouping, Literal, Ternary, Unary};
 
 pub struct AstPrinter;
 
@@ -35,6 +35,15 @@ impl ExprVisitor<String> for AstPrinter {
             "({:?} {:?})",
             unary.operator.lexeme,
             unary.right.accept(self)
+        )
+    }
+
+    fn visit_ternary(&self, _ternary: &Ternary) -> String {
+        format!(
+            "(ternary {:?} {:?} {:?})",
+            _ternary.condition.accept(self),
+            _ternary.true_branch.accept(self),
+            _ternary.false_branch.accept(self)
         )
     }
 }

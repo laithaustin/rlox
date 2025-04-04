@@ -15,6 +15,8 @@ pub enum TokenType {
     SEMICOLON,
     SLASH,
     STAR,
+    QUEST,
+    COLON,
 
     // one or two char tokens
     BANG,
@@ -71,6 +73,8 @@ impl FromStr for TokenType {
             "/" => Ok(Self::SLASH),
             "*" => Ok(Self::STAR),
             "!" => Ok(Self::BANG),
+            "?" => Ok(Self::QUEST),
+            ":" => Ok(Self::COLON),
             "!=" => Ok(Self::BANG_EQUAL),
             "=" => Ok(Self::EQUAL),
             "==" => Ok(Self::EQUAL_EQUAL),
