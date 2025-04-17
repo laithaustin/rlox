@@ -225,26 +225,16 @@ impl<'a> Parser<'a> {
         Err(())
     }
 
-    pub fn parse(&mut self) -> Result<(), ()> {
-        // Parser implementation will go here
-        let result: Result<Expr, ()> = self.expression(); // Changed type annotation
-        match result {
-            Ok(expr) => {
-                println!("Parsed expression successfully: {:?}", expr); // Added debug print
-                // let's print the parsed expression for now
-                let mut printer = AstPrinter;
-                // get the type of the expression
-                let printed: String = expr.accept(&printer); // Assuming accept method is
-                println!("Printed expression: {}", printed); // Added debug print
-            }
-            Err(_) => {
-                // Handle parsing error
-                self.error_reporter.error(0, "Failed to parse expression");
-                return Err(());
-            }
-        }
+    pub fn parse(&mut self) -> Result<Expr, ()> {
+        let expr = self.expression()?;
 
-        Ok(())
+        // Debug printing
+        println!("Parsed expression successfully: {:?}", expr);
+        let printer = AstPrinter;
+        let printed: String = expr.accept(&printer);
+        println!("Printed expression: {}", printed);
+
+        Ok(expr)
     }
 
     pub fn match_token(&mut self, token_types: &[TokenType]) -> bool {

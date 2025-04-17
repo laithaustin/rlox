@@ -5,7 +5,7 @@ use std::{
 
 mod compiler;
 
-use compiler::{ErrorReporter, Parser, Scanner};
+use compiler::{ErrorReporter, Interpreter, Parser, Scanner};
 
 pub struct Lox {
     had_error: bool,
@@ -35,7 +35,17 @@ impl Lox {
 
         // second phase: parse the tokens
         let mut parser = Parser::new(&scanner.tokens, self);
-        parser.parse();
+        match parser.parse() {
+            Ok(ast) => {
+                let interpreter = Interpreter::new();
+                let result = interpreter.interpret(&ast);
+                println!("{:?}", result);
+            }
+            Err(_) => {
+                // Parser error already reported via ErrorReporter trait
+                return;
+            }
+        }
     }
 
     fn run_prompt(&mut self) {

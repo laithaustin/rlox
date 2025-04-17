@@ -1,7 +1,7 @@
 use crate::compiler::token::Token;
 
 // Define Object type to represent Lox values
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Object {
     Nil,
     Boolean(bool),
