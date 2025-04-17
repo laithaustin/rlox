@@ -1,4 +1,3 @@
-pub mod ast;
 pub mod astPrinter;
 pub mod error;
 pub mod expr;
@@ -7,7 +6,6 @@ pub mod parser;
 pub mod scanner;
 pub mod token;
 
-pub use ast::Ast;
 pub use astPrinter::*;
 pub use error::ErrorReporter;
 pub use expr::Expr;
