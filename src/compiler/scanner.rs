@@ -1,7 +1,7 @@
+use crate::compiler::error::ErrorReporter;
+use crate::compiler::expr::Object;
 use crate::compiler::token::Token;
 use crate::compiler::token::TokenType;
-
-use crate::compiler::error::ErrorReporter;
 
 pub struct Scanner<'a> {
     source: String,

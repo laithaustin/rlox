@@ -54,7 +54,7 @@ impl<'a> Parser<'a> {
         // ternary -> comparison ( ("?") expression (":") ternary)*;
         let mut expr: Expr = self.comparison()?;
         while self.match_token(&[TokenType::QUEST]) {
-            let _ = self.advance(); // consume '?'  
+            let _ = self.advance(); // consume '?'
             let left = self.expression()?; // parse the left expression
             // check for ':' token
             if !self.match_token(&[TokenType::COLON]) {
@@ -164,13 +164,13 @@ impl<'a> Parser<'a> {
             // Create a Literal expression node wrapped in Expr enum
             return match token.token_type {
                 TokenType::NUMBER => {
-                    let value: f64 = token.lexeme.parse().unwrap(); // Parse the number
+                    let value: f64 = token.literal.unwrap().parse().unwrap(); // Parse the number
                     Ok(Expr::Literal(Literal {
                         value: Object::Number(value), // Wrap in Object::Number
                     }))
                 }
                 TokenType::STRING => {
-                    let value: String = token.lexeme.clone(); // Clone the string
+                    let value: String = token.literal.unwrap().clone(); // Clone the string
                     Ok(Expr::Literal(Literal {
                         value: Object::String(value), // Wrap in Object::String
                     }))
