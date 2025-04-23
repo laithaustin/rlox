@@ -107,6 +107,20 @@ impl<'a> Scanner<'a> {
             if self.peek() == '\n' {
                 self.line += 1;
             }
+            if self.peek() == '\\' {
+                self.advance(); // consume the backslash
+                match self.advance() {
+                    '\\' => s.push('\\'),
+                    '"' => s.push('"'),
+                    'n' => s.push('\n'),
+                    'r' => s.push('\r'),
+                    't' => s.push('\t'),
+                    _ => self
+                        .error_reporter
+                        .error(self.line, "Invalid escape sequence."),
+                }
+                continue;
+            }
             s.push(self.advance());
         }
 
