@@ -1,3 +1,4 @@
+use std::fmt;
 use std::str::FromStr;
 
 // Estalish basic token types for the lexer
@@ -135,6 +136,31 @@ impl Token {
             self.token_type,
             self.lexeme,
             self.literal.as_ref().unwrap_or(&"".to_string())
+        )
+    }
+}
+
+#[derive(Debug)]
+pub struct RuntimeError {
+    token: Token,
+    message: String,
+}
+
+impl RuntimeError {
+    pub fn new(token: Token, message: &str) -> Self {
+        RuntimeError {
+            token,
+            message: message.to_string(),
+        }
+    }
+}
+
+impl fmt::Display for RuntimeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "[line {}] Runtime Error at '{}': {}",
+            self.token.line, self.token.lexeme, self.message
         )
     }
 }

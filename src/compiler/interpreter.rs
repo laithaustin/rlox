@@ -2,6 +2,7 @@ use crate::compiler::expr::Expr;
 use crate::compiler::expr::ExprVisitor;
 use crate::compiler::expr::Object;
 use crate::compiler::expr::{Binary, Grouping, Literal, Ternary, Unary};
+use crate::compiler::token::RuntimeError;
 use crate::compiler::token::TokenType;
 
 pub struct Interpreter {
@@ -13,8 +14,9 @@ impl Interpreter {
         Interpreter {}
     }
 
-    pub fn interpret(&self, expr: &Expr) -> Object {
-        expr.accept(self)
+    pub fn interpret(&self, expr: &Expr) -> Result<Object, RuntimeError> {
+        let result = expr.accept(self)?;
+        Ok(result)
     }
 
     fn is_truthy(object: Object) -> bool {
@@ -26,92 +28,85 @@ impl Interpreter {
     }
 }
 
-impl ExprVisitor<Object> for Interpreter {
-    fn visit_literal(&self, literal: &Literal) -> Object {
+impl ExprVisitor<Result<Object, RuntimeError>> for Interpreter {
+    fn visit_literal(&self, literal: &Literal) -> Result<Object, RuntimeError> {
         match literal.value {
-            Object::Number(n) => Object::Number(n),
-            Object::String(ref s) => Object::String(s.clone()),
-            Object::Boolean(b) => Object::Boolean(b),
-            Object::Nil => Object::Nil,
-            _ => panic!("Unknown literal type"), // TODO: error handle this
+            Object::Number(n) => Ok(Object::Number(n)),
+            Object::String(ref s) => Ok(Object::String(s.clone())),
+            Object::Boolean(b) => Ok(Object::Boolean(b)),
+            Object::Nil => Ok(Object::Nil),
+            // Use a dummy token since Literal has no operator
+            _ => {
+                use crate::compiler::token::{Token, TokenType};
+                let dummy_token = Token::new(TokenType::EOF, "<unknown>".to_string(), 0, None);
+                Err(RuntimeError::new(dummy_token, "Unknown literal type"))
+            },
         }
     }
 
-    fn visit_unary(&self, unary: &Unary) -> Object {
-        let right = unary.right.accept(self);
+    fn visit_unary(&self, unary: &Unary) -> Result<Object, RuntimeError> {
+        let right = unary.right.accept(self)?;
 
         match unary.operator.token_type {
             TokenType::MINUS => {
                 if let Object::Number(n) = right {
-                    // fun fact: if let is a pattern matching
-                    // expression
-                    Object::Number(-n)
+                    Ok(Object::Number(-n))
                 } else {
-                    panic!("Unary minus can only be applied to numbers") // TODO: error handle this
+                    Err(RuntimeError::new(unary.operator.clone(), "Unary minus can only be applied to numbers"))
                 }
             }
-
             TokenType::BANG => {
-                if Interpreter::is_truthy(right) {
-                    Object::Boolean(false)
-                } else {
-                    Object::Boolean(true)
-                }
+                Ok(Object::Boolean(!Interpreter::is_truthy(right)))
             }
-
             _ => {
-                panic!("Unknown unary operator: {:?}", unary.operator.token_type);
+                Err(RuntimeError::new(unary.operator.clone(), &format!("Unknown unary operator: {:?}", unary.operator.token_type)))
             }
         }
     }
 
-    fn visit_grouping(&self, grouping: &Grouping) -> Object {
-        return grouping.expression.accept(self);
+    fn visit_grouping(&self, grouping: &Grouping) -> Result<Object, RuntimeError> {
+        grouping.expression.accept(self)
     }
 
-    fn visit_binary(&self, binary: &Binary) -> Object {
-        let left = binary.left.accept(self);
-        let right = binary.right.accept(self);
+    fn visit_binary(&self, binary: &Binary) -> Result<Object, RuntimeError> {
+        let left = binary.left.accept(self)?;
+        let right = binary.right.accept(self)?;
 
         match binary.operator.token_type {
             // basic arithmetic ops
             TokenType::MINUS => {
                 if let (Object::Number(l), Object::Number(r)) = (left, right) {
-                    return Object::Number(l - r);
+                    Ok(Object::Number(l - r))
                 } else {
-                    panic!("Binary minus can only be applied to numbers") // TODO: error handle this
+                    Err(RuntimeError::new(binary.operator.clone(), "Binary minus can only be applied to numbers"))
                 }
             }
-
             TokenType::PLUS => {
                 match (&left, &right) {
-                    (Object::Number(l), Object::Number(r)) => Object::Number(*l + *r),
-                    (Object::String(l), Object::String(r)) => Object::String(l.clone() + r),
-                    (Object::String(l), Object::Number(r)) => {
-                        Object::String(l.clone() + &r.to_string())
-                    }
-                    (Object::Number(l), Object::String(r)) => Object::String(l.to_string() + r),
-                    _ => panic!("Binary plus can only be applied to numbers or strings"), // TODO: error handle this
+                    (Object::Number(l), Object::Number(r)) => Ok(Object::Number(*l + *r)),
+                    (Object::String(l), Object::String(r)) => Ok(Object::String(l.clone() + r)),
+                    (Object::String(l), Object::Number(r)) => Ok(Object::String(l.clone() + &r.to_string())),
+                    (Object::Number(l), Object::String(r)) => Ok(Object::String(l.to_string() + r)),
+                    _ => Err(RuntimeError::new(binary.operator.clone(), "Binary plus can only be applied to numbers or strings")),
                 }
             }
-
             TokenType::SLASH => {
                 if let (Object::Number(l), Object::Number(r)) = (left, right) {
                     if r != 0.0 {
-                        Object::Number(l / r)
+                        Ok(Object::Number(l / r))
                     } else {
-                        panic!("Division by zero")
+                        Err(RuntimeError::new(binary.operator.clone(), "Division by zero"))
                     }
                 } else {
-                    panic!("Binary slash can only be applied to numbers") // TODO: error handle this
+                    Err(RuntimeError::new(binary.operator.clone(), "Binary slash can only be applied to numbers"))
                 }
             }
 
             TokenType::STAR => {
                 if let (Object::Number(l), Object::Number(r)) = (left, right) {
-                    Object::Number(l * r)
+                    Ok(Object::Number(l * r))
                 } else {
-                    panic!("Binary star can only be applied to numbers") // TODO: error handle this
+                    Err(RuntimeError::new(binary.operator.clone(), "Binary star can only be applied to numbers"))
                 }
             }
 
@@ -119,60 +114,52 @@ impl ExprVisitor<Object> for Interpreter {
             //
             TokenType::GREATER => {
                 if let (Object::Number(l), Object::Number(r)) = (left, right) {
-                    Object::Boolean(l > r)
+                    Ok(Object::Boolean(l > r))
                 } else {
-                    panic!("Binary greater can only be applied to numbers") // TODO: error handle this
+                    Err(RuntimeError::new(binary.operator.clone(), "Binary greater can only be applied to numbers"))
                 }
             }
 
             TokenType::GREATER_EQUAL => {
                 if let (Object::Number(l), Object::Number(r)) = (left, right) {
-                    Object::Boolean(l >= r)
+                    Ok(Object::Boolean(l >= r))
                 } else {
-                    panic!("Binary greater equal can only be applied to numbers") // TODO: error handle this
+                    Err(RuntimeError::new(binary.operator.clone(), "Binary greater equal can only be applied to numbers"))
                 }
             }
 
             TokenType::LESS => {
                 if let (Object::Number(l), Object::Number(r)) = (left, right) {
-                    Object::Boolean(l < r)
+                    Ok(Object::Boolean(l < r))
                 } else {
-                    panic!("Binary less can only be applied to numbers") // TODO: error handle this
+                    Err(RuntimeError::new(binary.operator.clone(), "Binary less can only be applied to numbers"))
                 }
             }
 
             TokenType::LESS_EQUAL => {
                 if let (Object::Number(l), Object::Number(r)) = (left, right) {
-                    Object::Boolean(l <= r)
+                    Ok(Object::Boolean(l <= r))
                 } else {
-                    panic!("Binary less equal can only be applied to numbers") // TODO: error handle this
+                    Err(RuntimeError::new(binary.operator.clone(), "Binary less equal can only be applied to numbers"))
                 }
             }
 
             TokenType::EQUAL_EQUAL => {
-                if left == right {
-                    Object::Boolean(true)
-                } else {
-                    Object::Boolean(false)
-                }
+                Ok(Object::Boolean(left == right))
             }
 
             TokenType::BANG_EQUAL => {
-                if left != right {
-                    Object::Boolean(true)
-                } else {
-                    Object::Boolean(false)
-                }
+                Ok(Object::Boolean(left != right))
             }
 
             _ => {
-                panic!("Unknown binary operator: {:?}", binary.operator.token_type);
+                Err(RuntimeError::new(binary.operator.clone(), &format!("Unknown binary operator: {:?}", binary.operator.token_type)))
             }
         }
     }
 
-    fn visit_ternary(&self, _ternary: &Ternary) -> Object {
-        let condition = _ternary.condition.accept(self);
+    fn visit_ternary(&self, _ternary: &Ternary) -> Result<Object, RuntimeError> {
+        let condition = _ternary.condition.accept(self)?;
         if Interpreter::is_truthy(condition) {
             _ternary.true_branch.accept(self)
         } else {

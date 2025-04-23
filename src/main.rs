@@ -38,8 +38,10 @@ impl Lox {
         match parser.parse() {
             Ok(ast) => {
                 let interpreter = Interpreter::new();
-                let result = interpreter.interpret(&ast);
-                println!("{:?}", result);
+                match interpreter.interpret(&ast) {
+                    Ok(value) => println!("{:?}", value),
+                    Err(e) => eprintln!("Runtime error: {}", e),
+                }
             }
             Err(_) => {
                 // Parser error already reported via ErrorReporter trait
