@@ -1,12 +1,18 @@
 use std::fs::File;
 use std::io::{BufWriter, Write};
 
+/*
+This script almost works. Not general purpose enough to pass in one pass but removes like 90% of the boilerplate.
+TODO: make better
+*/
+
 fn define_ast(output_dir: &str, base_name: &str, types: &[&str]) {
-    let path = format!("{}/{}.rs", output_dir, base_name);
+    let path = format!("{}/{}.rs", output_dir, base_name.to_lowercase());
     let mut file = std::fs::File::create(&path).expect("Unable to create file");
     let mut writer = BufWriter::new(file); // Import necessary types
     writeln!(writer, "use crate::compiler::token::Token;").unwrap();
     writeln!(writer, "use crate::compiler::expr::Object;\n").unwrap();
+    writeln!(writer, "use crate::compiler::expr::Expr;\n").unwrap();
 
     // Define the main enum
     writeln!(writer, "#[derive(Debug, Clone)]").unwrap();
@@ -99,7 +105,7 @@ fn main() {
 
     define_ast(
         output_dir,
-        "expr",
+        "Expr",
         &[
             "Binary   : Expr left, Token operator, Expr right",
             "Grouping : Expr expression",
@@ -111,7 +117,7 @@ fn main() {
 
     define_ast(
         output_dir,
-        "stmt",
+        "Stmt",
         &[
             "Expression : Expr expression",
             "Print      : Expr expression",

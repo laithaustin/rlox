@@ -1,9 +1,14 @@
 use crate::compiler::astPrinter::AstPrinter;
 use crate::compiler::expr::{Binary, Expr, Grouping, Literal, Object, Ternary, Unary};
+use crate::compiler::stmt::{Expression, Print, Stmt};
 use crate::compiler::token::TokenType;
 use crate::compiler::{ErrorReporter, Scanner, Token};
 
 // The essential grammar for lox is as follows (low to high precedence):
+// program -> statement* EOF
+// statement -> printStmt | exprStmt
+// printStmt -> "print" expression ";"
+// exprStmt -> expression ";"
 // expression -> equality;
 // equality -> ternary ( ( "!=" | "==" ) ternary)*;
 // ternary -> comparison ( ("?") expression (":") ternary)*; //NOTE: ternary operator is RIGHT
@@ -31,6 +36,37 @@ impl<'a> Parser<'a> {
     // implementing the grammar rules as methods
     pub fn expression(&mut self) -> Result<Expr, ()> {
         self.equality()
+    }
+
+    pub fn statement(&mut self) -> Result<Stmt, ()> {
+        if self.match_token(&[TokenType::PRINT]) {
+            self.advance(); //consume print
+            return self.print_expression();
+        } else {
+            self.expression_statement()
+        }
+    }
+
+    pub fn print_expression(&mut self) -> Result<Stmt, ()> {
+        let expr: Expr = self.expression()?;
+
+        if !self.match_token(&[TokenType::SEMICOLON]) {
+            self.error_reporter.error(0, "Expected ';' after value.");
+            return Err(());
+        }
+        self.advance(); // consume semicolon
+
+        Ok(Stmt::Print(Box::new(Print {
+            expression: Box::new(expr),
+        })))
+    }
+    pub fn expression_statement(&mut self) -> Result<Stmt, ()> {
+        let expr: Expr = self.expression()?;
+        self.advance(); //consume semicolon
+
+        Ok(Stmt::Expression(Box::new(Expression {
+            expression: Box::new(expr),
+        })))
     }
 
     pub fn equality(&mut self) -> Result<Expr, ()> {
@@ -158,7 +194,6 @@ impl<'a> Parser<'a> {
 
     pub fn primary(&mut self) -> Result<Expr, ()> {
         // primary -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")";
-
         if self.match_token(&[TokenType::NUMBER, TokenType::STRING]) {
             let token: Token = self.advance().unwrap().clone(); // Get the token
             // Create a Literal expression node wrapped in Expr enum
@@ -225,16 +260,13 @@ impl<'a> Parser<'a> {
         Err(())
     }
 
-    pub fn parse(&mut self) -> Result<Expr, ()> {
-        let expr = self.expression()?;
+    pub fn parse(&mut self) -> Result<Vec<Stmt>, ()> {
+        let mut statements = Vec::new();
+        while !self.is_at_end() {
+            statements.push(self.statement()?);
+        }
 
-        // Debug printing
-        println!("Parsed expression successfully: {:?}", expr);
-        let printer = AstPrinter;
-        let printed: String = expr.accept(&printer);
-        println!("Printed expression: {}", printed);
-
-        Ok(expr)
+        Ok(statements)
     }
 
     pub fn match_token(&mut self, token_types: &[TokenType]) -> bool {
@@ -265,9 +297,10 @@ impl<'a> Parser<'a> {
     }
 
     pub fn is_at_end(&self) -> bool {
-        return self.current >= self.tokens.len();
+        return self.current >= self.tokens.len()
+            || (self.current < self.tokens.len()
+                && self.tokens[self.current].token_type == TokenType::EOF);
     }
-
     pub fn peek(&mut self) -> &Token {
         if self.is_at_end() {
             // check if last token is EOF - if so return it else error

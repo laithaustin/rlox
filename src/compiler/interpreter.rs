@@ -2,8 +2,11 @@ use crate::compiler::expr::Expr;
 use crate::compiler::expr::ExprVisitor;
 use crate::compiler::expr::Object;
 use crate::compiler::expr::{Binary, Grouping, Literal, Ternary, Unary};
+use crate::compiler::stmt::Stmt;
+use crate::compiler::stmt::StmtVisitor;
 use crate::compiler::token::RuntimeError;
 use crate::compiler::token::TokenType;
+use std::ffi::NulError;
 
 pub struct Interpreter {
     // Interpreter state will go here
@@ -14,9 +17,15 @@ impl Interpreter {
         Interpreter {}
     }
 
-    pub fn interpret(&self, expr: &Expr) -> Result<Object, RuntimeError> {
-        let result = expr.accept(self)?;
-        Ok(result)
+    fn execute(&mut self, statement: &Stmt) -> Result<Object, RuntimeError> {
+        statement.accept(self)
+    }
+
+    pub fn interpret(&mut self, statements: Vec<Stmt>) -> Result<(), RuntimeError> {
+        for statement in statements.iter() {
+            self.execute(statement)?;
+        }
+        Ok(())
     }
 
     fn is_truthy(object: Object) -> bool {
@@ -25,6 +34,21 @@ impl Interpreter {
             Object::Boolean(b) => b,
             _ => true,
         }
+    }
+}
+
+impl StmtVisitor<Result<Object, RuntimeError>> for Interpreter {
+    fn visit_expression(
+        &self,
+        expression: &super::stmt::Expression,
+    ) -> Result<Object, RuntimeError> {
+        Ok(expression.expression.accept(self)?)
+    }
+
+    fn visit_print(&self, print: &super::stmt::Print) -> Result<Object, RuntimeError> {
+        let eval = print.expression.accept(self)?;
+        println!("{:?}", eval);
+        Ok(eval)
     }
 }
 
@@ -40,7 +64,7 @@ impl ExprVisitor<Result<Object, RuntimeError>> for Interpreter {
                 use crate::compiler::token::{Token, TokenType};
                 let dummy_token = Token::new(TokenType::EOF, "<unknown>".to_string(), 0, None);
                 Err(RuntimeError::new(dummy_token, "Unknown literal type"))
-            },
+            }
         }
     }
 
@@ -52,15 +76,17 @@ impl ExprVisitor<Result<Object, RuntimeError>> for Interpreter {
                 if let Object::Number(n) = right {
                     Ok(Object::Number(-n))
                 } else {
-                    Err(RuntimeError::new(unary.operator.clone(), "Unary minus can only be applied to numbers"))
+                    Err(RuntimeError::new(
+                        unary.operator.clone(),
+                        "Unary minus can only be applied to numbers",
+                    ))
                 }
             }
-            TokenType::BANG => {
-                Ok(Object::Boolean(!Interpreter::is_truthy(right)))
-            }
-            _ => {
-                Err(RuntimeError::new(unary.operator.clone(), &format!("Unknown unary operator: {:?}", unary.operator.token_type)))
-            }
+            TokenType::BANG => Ok(Object::Boolean(!Interpreter::is_truthy(right))),
+            _ => Err(RuntimeError::new(
+                unary.operator.clone(),
+                &format!("Unknown unary operator: {:?}", unary.operator.token_type),
+            )),
         }
     }
 
@@ -78,27 +104,39 @@ impl ExprVisitor<Result<Object, RuntimeError>> for Interpreter {
                 if let (Object::Number(l), Object::Number(r)) = (left, right) {
                     Ok(Object::Number(l - r))
                 } else {
-                    Err(RuntimeError::new(binary.operator.clone(), "Binary minus can only be applied to numbers"))
+                    Err(RuntimeError::new(
+                        binary.operator.clone(),
+                        "Binary minus can only be applied to numbers",
+                    ))
                 }
             }
-            TokenType::PLUS => {
-                match (&left, &right) {
-                    (Object::Number(l), Object::Number(r)) => Ok(Object::Number(*l + *r)),
-                    (Object::String(l), Object::String(r)) => Ok(Object::String(l.clone() + r)),
-                    (Object::String(l), Object::Number(r)) => Ok(Object::String(l.clone() + &r.to_string())),
-                    (Object::Number(l), Object::String(r)) => Ok(Object::String(l.to_string() + r)),
-                    _ => Err(RuntimeError::new(binary.operator.clone(), "Binary plus can only be applied to numbers or strings")),
+            TokenType::PLUS => match (&left, &right) {
+                (Object::Number(l), Object::Number(r)) => Ok(Object::Number(*l + *r)),
+                (Object::String(l), Object::String(r)) => Ok(Object::String(l.clone() + r)),
+                (Object::String(l), Object::Number(r)) => {
+                    Ok(Object::String(l.clone() + &r.to_string()))
                 }
-            }
+                (Object::Number(l), Object::String(r)) => Ok(Object::String(l.to_string() + r)),
+                _ => Err(RuntimeError::new(
+                    binary.operator.clone(),
+                    "Binary plus can only be applied to numbers or strings",
+                )),
+            },
             TokenType::SLASH => {
                 if let (Object::Number(l), Object::Number(r)) = (left, right) {
                     if r != 0.0 {
                         Ok(Object::Number(l / r))
                     } else {
-                        Err(RuntimeError::new(binary.operator.clone(), "Division by zero"))
+                        Err(RuntimeError::new(
+                            binary.operator.clone(),
+                            "Division by zero",
+                        ))
                     }
                 } else {
-                    Err(RuntimeError::new(binary.operator.clone(), "Binary slash can only be applied to numbers"))
+                    Err(RuntimeError::new(
+                        binary.operator.clone(),
+                        "Binary slash can only be applied to numbers",
+                    ))
                 }
             }
 
@@ -106,7 +144,10 @@ impl ExprVisitor<Result<Object, RuntimeError>> for Interpreter {
                 if let (Object::Number(l), Object::Number(r)) = (left, right) {
                     Ok(Object::Number(l * r))
                 } else {
-                    Err(RuntimeError::new(binary.operator.clone(), "Binary star can only be applied to numbers"))
+                    Err(RuntimeError::new(
+                        binary.operator.clone(),
+                        "Binary star can only be applied to numbers",
+                    ))
                 }
             }
 
@@ -116,7 +157,10 @@ impl ExprVisitor<Result<Object, RuntimeError>> for Interpreter {
                 if let (Object::Number(l), Object::Number(r)) = (left, right) {
                     Ok(Object::Boolean(l > r))
                 } else {
-                    Err(RuntimeError::new(binary.operator.clone(), "Binary greater can only be applied to numbers"))
+                    Err(RuntimeError::new(
+                        binary.operator.clone(),
+                        "Binary greater can only be applied to numbers",
+                    ))
                 }
             }
 
@@ -124,7 +168,10 @@ impl ExprVisitor<Result<Object, RuntimeError>> for Interpreter {
                 if let (Object::Number(l), Object::Number(r)) = (left, right) {
                     Ok(Object::Boolean(l >= r))
                 } else {
-                    Err(RuntimeError::new(binary.operator.clone(), "Binary greater equal can only be applied to numbers"))
+                    Err(RuntimeError::new(
+                        binary.operator.clone(),
+                        "Binary greater equal can only be applied to numbers",
+                    ))
                 }
             }
 
@@ -132,7 +179,10 @@ impl ExprVisitor<Result<Object, RuntimeError>> for Interpreter {
                 if let (Object::Number(l), Object::Number(r)) = (left, right) {
                     Ok(Object::Boolean(l < r))
                 } else {
-                    Err(RuntimeError::new(binary.operator.clone(), "Binary less can only be applied to numbers"))
+                    Err(RuntimeError::new(
+                        binary.operator.clone(),
+                        "Binary less can only be applied to numbers",
+                    ))
                 }
             }
 
@@ -140,21 +190,21 @@ impl ExprVisitor<Result<Object, RuntimeError>> for Interpreter {
                 if let (Object::Number(l), Object::Number(r)) = (left, right) {
                     Ok(Object::Boolean(l <= r))
                 } else {
-                    Err(RuntimeError::new(binary.operator.clone(), "Binary less equal can only be applied to numbers"))
+                    Err(RuntimeError::new(
+                        binary.operator.clone(),
+                        "Binary less equal can only be applied to numbers",
+                    ))
                 }
             }
 
-            TokenType::EQUAL_EQUAL => {
-                Ok(Object::Boolean(left == right))
-            }
+            TokenType::EQUAL_EQUAL => Ok(Object::Boolean(left == right)),
 
-            TokenType::BANG_EQUAL => {
-                Ok(Object::Boolean(left != right))
-            }
+            TokenType::BANG_EQUAL => Ok(Object::Boolean(left != right)),
 
-            _ => {
-                Err(RuntimeError::new(binary.operator.clone(), &format!("Unknown binary operator: {:?}", binary.operator.token_type)))
-            }
+            _ => Err(RuntimeError::new(
+                binary.operator.clone(),
+                &format!("Unknown binary operator: {:?}", binary.operator.token_type),
+            )),
         }
     }
 

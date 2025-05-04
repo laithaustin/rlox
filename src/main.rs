@@ -37,9 +37,9 @@ impl Lox {
         let mut parser = Parser::new(&scanner.tokens, self);
         match parser.parse() {
             Ok(ast) => {
-                let interpreter = Interpreter::new();
-                match interpreter.interpret(&ast) {
-                    Ok(value) => println!("{:?}", value),
+                let mut interpreter = Interpreter::new();
+                match interpreter.interpret(ast) {
+                    Ok(value) => (),
                     Err(e) => eprintln!("Runtime error: {}", e),
                 }
             }
