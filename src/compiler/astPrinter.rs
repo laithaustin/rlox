@@ -8,11 +8,19 @@ fn visit_unary(&self, unary: &Unary) -> T;
 } */
 
 use crate::compiler::expr::ExprVisitor;
-use crate::compiler::expr::{Binary, Grouping, Literal, Ternary, Unary};
+use crate::compiler::expr::{Binary, Grouping, Literal, Ternary, Unary, Variable};
 
 pub struct AstPrinter;
 
 impl ExprVisitor<String> for AstPrinter {
+    fn visit_assign(&self, assign: &super::expr::Assign) -> String {
+        format!(
+            "({:?} : {:?})",
+            assign.name.lexeme,
+            assign.value.accept(self)
+        )
+    }
+
     fn visit_binary(&self, binary: &Binary) -> String {
         format!(
             "({:?} {:?} {:?})",
@@ -45,5 +53,9 @@ impl ExprVisitor<String> for AstPrinter {
             _ternary.true_branch.accept(self),
             _ternary.false_branch.accept(self)
         )
+    }
+
+    fn visit_variable(&self, variable: &Variable) -> String {
+        format!("{:?}", variable.name)
     }
 }

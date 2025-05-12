@@ -1,3 +1,4 @@
+use crate::compiler::env::Env;
 use crate::compiler::expr::Expr;
 use crate::compiler::expr::ExprVisitor;
 use crate::compiler::expr::Object;
@@ -10,11 +11,14 @@ use std::ffi::NulError;
 
 pub struct Interpreter {
     // Interpreter state will go here
+    env: std::cell::RefCell<Env>, // allows for us to mutate the environment by borrowing it mutably
 }
 
 impl Interpreter {
     pub fn new() -> Self {
-        Interpreter {}
+        Interpreter {
+            env: std::cell::RefCell::new(Env::new()),
+        }
     }
 
     fn execute(&mut self, statement: &Stmt) -> Result<Object, RuntimeError> {
@@ -38,6 +42,12 @@ impl Interpreter {
 }
 
 impl StmtVisitor<Result<Object, RuntimeError>> for Interpreter {
+    fn visit_var(&self, var: &super::stmt::Var) -> Result<Object, RuntimeError> {
+        let value = var.initializer.accept(self)?;
+        self.env.borrow_mut().define(var.name.lexeme.clone(), value);
+        Ok(Object::Nil)
+    }
+
     fn visit_expression(
         &self,
         expression: &super::stmt::Expression,
@@ -53,6 +63,15 @@ impl StmtVisitor<Result<Object, RuntimeError>> for Interpreter {
 }
 
 impl ExprVisitor<Result<Object, RuntimeError>> for Interpreter {
+    fn visit_assign(&self, assign: &super::expr::Assign) -> Result<Object, RuntimeError> {
+        let value = assign.value.accept(self)?;
+        Ok(self.env.borrow_mut().assign(&assign.name, value).clone())
+    }
+
+    fn visit_variable(&self, variable: &super::expr::Variable) -> Result<Object, RuntimeError> {
+        Ok(self.env.borrow().get(&variable.name.lexeme).unwrap())
+    }
+
     fn visit_literal(&self, literal: &Literal) -> Result<Object, RuntimeError> {
         match literal.value {
             Object::Number(n) => Ok(Object::Number(n)),

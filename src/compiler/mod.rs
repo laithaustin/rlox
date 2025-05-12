@@ -1,4 +1,5 @@
 pub mod astPrinter;
+pub mod env;
 pub mod error;
 pub mod expr;
 pub mod interpreter;
@@ -8,6 +9,7 @@ pub mod stmt;
 pub mod token;
 
 pub use astPrinter::*;
+pub use env::Env;
 pub use error::ErrorReporter;
 pub use expr::Expr;
 pub use interpreter::Interpreter;

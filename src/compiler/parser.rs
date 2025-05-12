@@ -1,22 +1,25 @@
-use crate::compiler::astPrinter::AstPrinter;
-use crate::compiler::expr::{Binary, Expr, Grouping, Literal, Object, Ternary, Unary};
-use crate::compiler::stmt::{Expression, Print, Stmt};
+use crate::compiler::expr::{
+    Assign, Binary, Expr, Grouping, Literal, Object, Ternary, Unary, Variable,
+};
+use crate::compiler::stmt::{Expression, Print, Stmt, Var};
 use crate::compiler::token::TokenType;
-use crate::compiler::{ErrorReporter, Scanner, Token};
+use crate::compiler::{ErrorReporter, Token};
 
 // The essential grammar for lox is as follows (low to high precedence):
-// program -> statement* EOF
+// program -> declaration* EOF
+// declaration -> varStmt | statement
+// varStmt -> "var" identifier ("=" expression)? ";"
 // statement -> printStmt | exprStmt
 // printStmt -> "print" expression ";"
 // exprStmt -> expression ";"
-// expression -> equality;
+// expression -> IDENTIFIER "=" expression | equality;
 // equality -> ternary ( ( "!=" | "==" ) ternary)*;
 // ternary -> comparison ( ("?") expression (":") ternary)*; //NOTE: ternary operator is RIGHT
 // comparison -> term ( ( ">" | ">=" | "<" | "<=" ) term )*;
 // term -> factor ( ( "-" | "+" ) factor )*;
 // factor -> unary ( ( "/" | "*" ) unary )*;
 // unary -> ( "!" | "-" ) unary | primary;
-// primary -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" ;
+// primary -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | identifier ;
 
 pub struct Parser<'a> {
     tokens: &'a Vec<Token>,
@@ -35,7 +38,66 @@ impl<'a> Parser<'a> {
 
     // implementing the grammar rules as methods
     pub fn expression(&mut self) -> Result<Expr, ()> {
-        self.equality()
+        let lval = self.equality()?; // get left expression
+
+        if self.match_token(&[TokenType::EQUAL]) {
+            let equals: &Token = self.advance().unwrap();
+            let val: Expr = self.expression()?;
+
+            // check if lval is a variable type expression
+            if let Expr::Variable(name) = lval {
+                return Ok(Expr::Assign(Box::new(Assign {
+                    name: name.name,
+                    value: Box::new(val),
+                })));
+            }
+
+            //TODO: proper runtime error here
+            self.error_reporter.error(0, "Invalid assignment target");
+            return Err(());
+        }
+
+        Ok(lval)
+    }
+
+    pub fn declaration(&mut self) -> Result<Stmt, ()> {
+        if self.match_token(&[TokenType::VAR]) {
+            return self.var_declar();
+        }
+        self.statement()
+    }
+
+    pub fn var_declar(&mut self) -> Result<Stmt, ()> {
+        self.advance(); // consume var
+
+        match self.advance() {
+            // consumes the identifier
+            Ok(token) => {
+                let name = token.clone();
+                let initializer = if self.match_token(&[TokenType::EQUAL]) {
+                    self.advance(); // consume "="
+                    let value = self.expression()?;
+                    Box::new(value)
+                } else {
+                    Box::new(Expr::Literal(Literal { value: Object::Nil }))
+                };
+
+                if !self.match_token(&[TokenType::SEMICOLON]) {
+                    self.error_reporter
+                        .error(0, "Expect ';' after variable declaration.");
+                    return Err(());
+                }
+                self.advance(); //consume
+                Ok(Stmt::Var(Box::new(Var {
+                    name: Box::new(name),
+                    initializer,
+                })))
+            }
+            Err(msg) => {
+                self.error_reporter.error(0, &msg);
+                return Err(());
+            }
+        }
     }
 
     pub fn statement(&mut self) -> Result<Stmt, ()> {
@@ -193,7 +255,7 @@ impl<'a> Parser<'a> {
     }
 
     pub fn primary(&mut self) -> Result<Expr, ()> {
-        // primary -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")";
+        // primary -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | identifier;
         if self.match_token(&[TokenType::NUMBER, TokenType::STRING]) {
             let token: Token = self.advance().unwrap().clone(); // Get the token
             // Create a Literal expression node wrapped in Expr enum
@@ -255,6 +317,18 @@ impl<'a> Parser<'a> {
             }))); // Grouping expression
         }
 
+        if self.match_token(&[TokenType::IDENTIFIER]) {
+            let expr = self.advance().unwrap();
+            return Ok(Expr::Variable(Box::new(Variable {
+                name: Token::new(
+                    TokenType::IDENTIFIER,
+                    expr.lexeme.clone(),
+                    expr.line,
+                    expr.literal.clone(),
+                ),
+            })));
+        }
+
         // If none of the above, it's an error
         self.error_reporter.error(0, "Unexpected token");
         Err(())
@@ -263,7 +337,7 @@ impl<'a> Parser<'a> {
     pub fn parse(&mut self) -> Result<Vec<Stmt>, ()> {
         let mut statements = Vec::new();
         while !self.is_at_end() {
-            statements.push(self.statement()?);
+            statements.push(self.declaration()?);
         }
 
         Ok(statements)
@@ -276,6 +350,10 @@ impl<'a> Parser<'a> {
             }
         }
         false
+    }
+
+    pub fn previous(&mut self) -> &Token {
+        &self.tokens[self.current - 1]
     }
 
     pub fn check(&mut self, token_type: &TokenType) -> bool {

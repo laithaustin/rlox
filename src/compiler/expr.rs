@@ -17,6 +17,8 @@ pub enum Expr {
     Literal(Literal),
     Unary(Box<Unary>),
     Ternary(Box<Ternary>),
+    Variable(Box<Variable>),
+    Assign(Box<Assign>),
 }
 
 impl Expr {
@@ -27,6 +29,8 @@ impl Expr {
             Expr::Literal(l) => visitor.visit_literal(l),
             Expr::Unary(u) => visitor.visit_unary(u),
             Expr::Ternary(t) => visitor.visit_ternary(t),
+            Expr::Variable(v) => visitor.visit_variable(v),
+            Expr::Assign(a) => visitor.visit_assign(a),
         }
     }
 }
@@ -38,6 +42,8 @@ pub trait ExprVisitor<T> {
     fn visit_literal(&self, literal: &Literal) -> T;
     fn visit_unary(&self, unary: &Unary) -> T;
     fn visit_ternary(&self, ternary: &Ternary) -> T;
+    fn visit_variable(&self, variable: &Variable) -> T;
+    fn visit_assign(&self, assign: &Assign) -> T;
 }
 
 #[derive(Debug, Clone)]
@@ -68,4 +74,15 @@ pub struct Ternary {
     pub condition: Box<Expr>,
     pub true_branch: Box<Expr>,
     pub false_branch: Box<Expr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Variable {
+    pub name: Token,
+}
+
+#[derive(Debug, Clone)]
+pub struct Assign {
+    pub name: Token,
+    pub value: Box<Expr>,
 }
