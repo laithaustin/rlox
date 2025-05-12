@@ -1,13 +1,11 @@
 use crate::compiler::env::Env;
-use crate::compiler::expr::Expr;
+use crate::compiler::error::{LoxError, Result};
 use crate::compiler::expr::ExprVisitor;
 use crate::compiler::expr::Object;
 use crate::compiler::expr::{Binary, Grouping, Literal, Ternary, Unary};
 use crate::compiler::stmt::Stmt;
 use crate::compiler::stmt::StmtVisitor;
-use crate::compiler::token::RuntimeError;
 use crate::compiler::token::TokenType;
-use std::ffi::NulError;
 
 pub struct Interpreter {
     // Interpreter state will go here
@@ -21,11 +19,11 @@ impl Interpreter {
         }
     }
 
-    fn execute(&mut self, statement: &Stmt) -> Result<Object, RuntimeError> {
+    fn execute(&mut self, statement: &Stmt) -> Result<Object> {
         statement.accept(self)
     }
 
-    pub fn interpret(&mut self, statements: Vec<Stmt>) -> Result<(), RuntimeError> {
+    pub fn interpret(&mut self, statements: Vec<Stmt>) -> Result<()> {
         for statement in statements.iter() {
             self.execute(statement)?;
         }
@@ -41,8 +39,8 @@ impl Interpreter {
     }
 }
 
-impl StmtVisitor<Result<Object, RuntimeError>> for Interpreter {
-    fn visit_var(&self, var: &super::stmt::Var) -> Result<Object, RuntimeError> {
+impl StmtVisitor<Result<Object>> for Interpreter {
+    fn visit_var(&self, var: &super::stmt::Var) -> Result<Object> {
         let value = var.initializer.accept(self)?;
         self.env.borrow_mut().define(var.name.lexeme.clone(), value);
         Ok(Object::Nil)
@@ -51,43 +49,51 @@ impl StmtVisitor<Result<Object, RuntimeError>> for Interpreter {
     fn visit_expression(
         &self,
         expression: &super::stmt::Expression,
-    ) -> Result<Object, RuntimeError> {
+    ) -> Result<Object> {
         Ok(expression.expression.accept(self)?)
     }
 
-    fn visit_print(&self, print: &super::stmt::Print) -> Result<Object, RuntimeError> {
+    fn visit_print(&self, print: &super::stmt::Print) -> Result<Object> {
         let eval = print.expression.accept(self)?;
         println!("{:?}", eval);
         Ok(eval)
     }
 }
 
-impl ExprVisitor<Result<Object, RuntimeError>> for Interpreter {
-    fn visit_assign(&self, assign: &super::expr::Assign) -> Result<Object, RuntimeError> {
+impl ExprVisitor<Result<Object>> for Interpreter {
+    fn visit_assign(&self, assign: &super::expr::Assign) -> Result<Object> {
         let value = assign.value.accept(self)?;
-        Ok(self.env.borrow_mut().assign(&assign.name, value).clone())
+        let cloned_value = value.clone();
+        self.env.borrow_mut().assign(&assign.name, value)?;
+        Ok(cloned_value)
     }
 
-    fn visit_variable(&self, variable: &super::expr::Variable) -> Result<Object, RuntimeError> {
-        Ok(self.env.borrow().get(&variable.name.lexeme).unwrap())
+    fn visit_variable(&self, variable: &super::expr::Variable) -> Result<Object> {
+        match self.env.borrow().get(&variable.name.lexeme, &variable.name) {
+            Ok(obj) => Ok(obj),
+            Err(e) => Err(LoxError::new_runtime(
+                variable.name.clone(),
+                &format!("Undefined variable '{}'.", variable.name.lexeme)
+            ))
+        }
     }
 
-    fn visit_literal(&self, literal: &Literal) -> Result<Object, RuntimeError> {
+    fn visit_literal(&self, literal: &Literal) -> Result<Object> {
         match literal.value {
             Object::Number(n) => Ok(Object::Number(n)),
             Object::String(ref s) => Ok(Object::String(s.clone())),
             Object::Boolean(b) => Ok(Object::Boolean(b)),
             Object::Nil => Ok(Object::Nil),
             // Use a dummy token since Literal has no operator
-            _ => {
+            Object::Error(ref msg) => {
                 use crate::compiler::token::{Token, TokenType};
                 let dummy_token = Token::new(TokenType::EOF, "<unknown>".to_string(), 0, None);
-                Err(RuntimeError::new(dummy_token, "Unknown literal type"))
+                Err(LoxError::new_runtime(dummy_token, msg))
             }
         }
     }
 
-    fn visit_unary(&self, unary: &Unary) -> Result<Object, RuntimeError> {
+    fn visit_unary(&self, unary: &Unary) -> Result<Object> {
         let right = unary.right.accept(self)?;
 
         match unary.operator.token_type {
@@ -95,25 +101,25 @@ impl ExprVisitor<Result<Object, RuntimeError>> for Interpreter {
                 if let Object::Number(n) = right {
                     Ok(Object::Number(-n))
                 } else {
-                    Err(RuntimeError::new(
+                    Err(LoxError::new_runtime(
                         unary.operator.clone(),
                         "Unary minus can only be applied to numbers",
                     ))
                 }
             }
             TokenType::BANG => Ok(Object::Boolean(!Interpreter::is_truthy(right))),
-            _ => Err(RuntimeError::new(
+            _ => Err(LoxError::new_runtime(
                 unary.operator.clone(),
                 &format!("Unknown unary operator: {:?}", unary.operator.token_type),
             )),
         }
     }
 
-    fn visit_grouping(&self, grouping: &Grouping) -> Result<Object, RuntimeError> {
+    fn visit_grouping(&self, grouping: &Grouping) -> Result<Object> {
         grouping.expression.accept(self)
     }
 
-    fn visit_binary(&self, binary: &Binary) -> Result<Object, RuntimeError> {
+    fn visit_binary(&self, binary: &Binary) -> Result<Object> {
         let left = binary.left.accept(self)?;
         let right = binary.right.accept(self)?;
 
@@ -123,7 +129,7 @@ impl ExprVisitor<Result<Object, RuntimeError>> for Interpreter {
                 if let (Object::Number(l), Object::Number(r)) = (left, right) {
                     Ok(Object::Number(l - r))
                 } else {
-                    Err(RuntimeError::new(
+                    Err(LoxError::new_runtime(
                         binary.operator.clone(),
                         "Binary minus can only be applied to numbers",
                     ))
@@ -136,7 +142,7 @@ impl ExprVisitor<Result<Object, RuntimeError>> for Interpreter {
                     Ok(Object::String(l.clone() + &r.to_string()))
                 }
                 (Object::Number(l), Object::String(r)) => Ok(Object::String(l.to_string() + r)),
-                _ => Err(RuntimeError::new(
+                _ => Err(LoxError::new_runtime(
                     binary.operator.clone(),
                     "Binary plus can only be applied to numbers or strings",
                 )),
@@ -146,13 +152,13 @@ impl ExprVisitor<Result<Object, RuntimeError>> for Interpreter {
                     if r != 0.0 {
                         Ok(Object::Number(l / r))
                     } else {
-                        Err(RuntimeError::new(
+                        Err(LoxError::new_runtime(
                             binary.operator.clone(),
                             "Division by zero",
                         ))
                     }
                 } else {
-                    Err(RuntimeError::new(
+                    Err(LoxError::new_runtime(
                         binary.operator.clone(),
                         "Binary slash can only be applied to numbers",
                     ))
@@ -163,7 +169,7 @@ impl ExprVisitor<Result<Object, RuntimeError>> for Interpreter {
                 if let (Object::Number(l), Object::Number(r)) = (left, right) {
                     Ok(Object::Number(l * r))
                 } else {
-                    Err(RuntimeError::new(
+                    Err(LoxError::new_runtime(
                         binary.operator.clone(),
                         "Binary star can only be applied to numbers",
                     ))
@@ -176,7 +182,7 @@ impl ExprVisitor<Result<Object, RuntimeError>> for Interpreter {
                 if let (Object::Number(l), Object::Number(r)) = (left, right) {
                     Ok(Object::Boolean(l > r))
                 } else {
-                    Err(RuntimeError::new(
+                    Err(LoxError::new_runtime(
                         binary.operator.clone(),
                         "Binary greater can only be applied to numbers",
                     ))
@@ -187,7 +193,7 @@ impl ExprVisitor<Result<Object, RuntimeError>> for Interpreter {
                 if let (Object::Number(l), Object::Number(r)) = (left, right) {
                     Ok(Object::Boolean(l >= r))
                 } else {
-                    Err(RuntimeError::new(
+                    Err(LoxError::new_runtime(
                         binary.operator.clone(),
                         "Binary greater equal can only be applied to numbers",
                     ))
@@ -198,7 +204,7 @@ impl ExprVisitor<Result<Object, RuntimeError>> for Interpreter {
                 if let (Object::Number(l), Object::Number(r)) = (left, right) {
                     Ok(Object::Boolean(l < r))
                 } else {
-                    Err(RuntimeError::new(
+                    Err(LoxError::new_runtime(
                         binary.operator.clone(),
                         "Binary less can only be applied to numbers",
                     ))
@@ -209,7 +215,7 @@ impl ExprVisitor<Result<Object, RuntimeError>> for Interpreter {
                 if let (Object::Number(l), Object::Number(r)) = (left, right) {
                     Ok(Object::Boolean(l <= r))
                 } else {
-                    Err(RuntimeError::new(
+                    Err(LoxError::new_runtime(
                         binary.operator.clone(),
                         "Binary less equal can only be applied to numbers",
                     ))
@@ -220,14 +226,14 @@ impl ExprVisitor<Result<Object, RuntimeError>> for Interpreter {
 
             TokenType::BANG_EQUAL => Ok(Object::Boolean(left != right)),
 
-            _ => Err(RuntimeError::new(
+            _ => Err(LoxError::new_runtime(
                 binary.operator.clone(),
                 &format!("Unknown binary operator: {:?}", binary.operator.token_type),
             )),
         }
     }
 
-    fn visit_ternary(&self, _ternary: &Ternary) -> Result<Object, RuntimeError> {
+    fn visit_ternary(&self, _ternary: &Ternary) -> Result<Object> {
         let condition = _ternary.condition.accept(self)?;
         if Interpreter::is_truthy(condition) {
             _ternary.true_branch.accept(self)

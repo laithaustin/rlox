@@ -7,6 +7,7 @@ pub enum Object {
     Boolean(bool),
     Number(f64),
     String(String),
+    Error(String),
 }
 
 // Enum-based AST representation

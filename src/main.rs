@@ -5,21 +5,30 @@ use std::{
 
 mod compiler;
 
-use compiler::{ErrorReporter, Interpreter, Parser, Scanner};
+use compiler::{ErrorReporter, Interpreter, LoxError, LoxErrorKind, Parser, Scanner};
 
 pub struct Lox {
     had_error: bool,
+    had_runtime_error: bool,
 }
 
 impl ErrorReporter for Lox {
     fn error(&mut self, line: usize, message: &str) {
         self.report(line, "", message);
     }
+    
+    fn runtime_error(&mut self, error: &LoxError) {
+        eprintln!("{}", error);
+        self.had_runtime_error = true;
+    }
 }
 
 impl Lox {
     fn new() -> Self {
-        Self { had_error: false }
+        Self { 
+            had_error: false,
+            had_runtime_error: false,
+        }
     }
 
     fn run(&mut self, source: String) {
@@ -39,12 +48,17 @@ impl Lox {
             Ok(ast) => {
                 let mut interpreter = Interpreter::new();
                 match interpreter.interpret(ast) {
-                    Ok(value) => (),
-                    Err(e) => eprintln!("Runtime error: {}", e),
+                    Ok(_) => (),
+                    Err(e) => {
+                        eprintln!("Runtime error: {}", e);
+                        self.had_runtime_error = true;
+                    }
                 }
             }
-            Err(_) => {
-                // Parser error already reported via ErrorReporter trait
+            Err(error) => {
+                // Display the parsing error
+                eprintln!("Parse error: {}", error);
+                self.had_error = true;
                 return;
             }
         }
@@ -68,6 +82,7 @@ impl Lox {
             self.run(line);
             // prevent error from stopping the REPL
             self.had_error = false;
+            self.had_runtime_error = false;
         }
     }
 
@@ -79,8 +94,12 @@ impl Lox {
 
         self.run(content);
 
+        // Exit with different error codes for different error types
         if self.had_error {
             std::process::exit(65);
+        }
+        if self.had_runtime_error {
+            std::process::exit(70);
         }
     }
 

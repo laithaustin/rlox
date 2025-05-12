@@ -10,7 +10,7 @@ pub mod token;
 
 pub use astPrinter::*;
 pub use env::Env;
-pub use error::ErrorReporter;
+pub use error::{ErrorReporter, LoxError, LoxErrorKind, Result};
 pub use expr::Expr;
 pub use interpreter::Interpreter;
 pub use parser::Parser;

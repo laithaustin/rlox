@@ -140,27 +140,4 @@ impl Token {
     }
 }
 
-#[derive(Debug)]
-pub struct RuntimeError {
-    token: Token,
-    message: String,
-}
-
-impl RuntimeError {
-    pub fn new(token: Token, message: &str) -> Self {
-        RuntimeError {
-            token,
-            message: message.to_string(),
-        }
-    }
-}
-
-impl fmt::Display for RuntimeError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "[line {}] Runtime Error at '{}': {}",
-            self.token.line, self.token.lexeme, self.message
-        )
-    }
-}
+// RuntimeError has been moved to the error.rs module
