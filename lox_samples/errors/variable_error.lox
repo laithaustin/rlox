@@ -1,0 +1,21 @@
+// Example 3: Variable errors in Lox
+// This script contains various variable errors to demonstrate error reporting
+
+// 1. Undefined variable
+print undefinedVariable;  // Variable not defined before use
+
+// 2. Redeclaration of variable in same scope (if supported)
+var a = 5;
+var a = 10;  // Redeclaring a variable in same scope
+
+// 3. Using a variable outside its scope
+if (true) {
+  var scoped = 42;
+}
+print scoped;  // Using variable outside its scope
+
+// 4. Invalid variable name (starts with number)
+var 1invalid = 100;  // Variables can't start with numbers
+
+// 5. Assignment to undefined variable
+undefinedVar = 50;  // Can't assign to undefined variable

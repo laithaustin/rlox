@@ -1,0 +1,8 @@
+var a = 5;
+print a + 2;
+a = 7;
+print a * a;
+
+var b;
+a = b = 6;
+print a / b;

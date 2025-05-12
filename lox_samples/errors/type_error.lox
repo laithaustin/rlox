@@ -1,0 +1,21 @@
+// Example 2: Runtime type errors in Lox
+// This script contains various type errors to demonstrate runtime error reporting
+
+// 1. Addition between incompatible types
+var message = "Hello";
+print message + 123;  // String + Number is ok, but demonstrates type conversion
+
+// 2. Subtraction with non-numbers
+print "world" - "hello";  // Strings can't be subtracted
+
+// 3. Division by zero
+var x = 10;
+var y = 0;
+print x / y;  // Division by zero error
+
+// 4. Comparison between incompatible types
+print "string" > 100;  // Can't compare string with number
+
+// 5. Unary minus on non-number
+var greeting = "Hello";
+print -greeting;  // Can't negate a string
