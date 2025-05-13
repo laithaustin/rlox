@@ -1,4 +1,5 @@
 // Include our error reporting test modules
+mod block_scoping_tests;
 mod error_reporting;
 mod runtime_errors;
 

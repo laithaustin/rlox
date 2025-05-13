@@ -68,6 +68,13 @@ impl<'a> Parser<'a> {
             stmts.push(stmt);
         }
 
+        if !self.match_token(&[TokenType::RBRACE]) {
+            let current_token = self.peek().clone();
+            return Err(LoxError::new_parse(
+                current_token,
+                "Expected '}' after block.",
+            ));
+        }
         self.advance()?; // consume '}'
         Ok(Stmt::Block(Box::new(Block { statements: stmts })))
     }
