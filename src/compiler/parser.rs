@@ -1,7 +1,7 @@
 use crate::compiler::expr::{
     Assign, Binary, Expr, Grouping, Literal, Object, Ternary, Unary, Variable,
 };
-use crate::compiler::stmt::{Expression, Print, Stmt, Var};
+use crate::compiler::stmt::{Block, Expression, Print, Stmt, Var};
 use crate::compiler::token::TokenType;
 use crate::compiler::{ErrorReporter, LoxError, Result, Token};
 
@@ -9,7 +9,8 @@ use crate::compiler::{ErrorReporter, LoxError, Result, Token};
 // program -> declaration* EOF
 // declaration -> varStmt | statement
 // varStmt -> "var" identifier ("=" expression)? ";"
-// statement -> printStmt | exprStmt
+// statement -> printStmt | exprStmt | block ";"
+// block -> "{" declaration* "}" ;
 // printStmt -> "print" expression ";"
 // exprStmt -> expression ";"
 // expression -> IDENTIFIER "=" expression | equality;
@@ -52,13 +53,23 @@ impl<'a> Parser<'a> {
                 })));
             }
 
-            return Err(LoxError::new_parse(
-                equals,
-                "Invalid assignment target",
-            ));
+            return Err(LoxError::new_parse(equals, "Invalid assignment target"));
         }
 
         Ok(lval)
+    }
+
+    pub fn block(&mut self) -> Result<Stmt> {
+        self.advance()?; // consume '{'
+        let mut stmts: Vec<Stmt> = Vec::new();
+
+        while !self.check(&TokenType::RBRACE) && !self.is_at_end() {
+            let stmt = self.declaration()?;
+            stmts.push(stmt);
+        }
+
+        self.advance()?; // consume '}'
+        Ok(Stmt::Block(Box::new(Block { statements: stmts })))
     }
 
     pub fn declaration(&mut self) -> Result<Stmt> {
@@ -101,6 +112,8 @@ impl<'a> Parser<'a> {
         if self.match_token(&[TokenType::PRINT]) {
             self.advance()?; //consume print
             return self.print_expression();
+        } else if self.match_token(&[TokenType::LBRACE]) {
+            return self.block();
         } else {
             self.expression_statement()
         }

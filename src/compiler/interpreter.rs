@@ -1,4 +1,5 @@
 use crate::compiler::env::Env;
+use crate::compiler::env::EnvRef;
 use crate::compiler::error::{LoxError, Result};
 use crate::compiler::expr::ExprVisitor;
 use crate::compiler::expr::Object;
@@ -6,16 +7,17 @@ use crate::compiler::expr::{Binary, Grouping, Literal, Ternary, Unary};
 use crate::compiler::stmt::Stmt;
 use crate::compiler::stmt::StmtVisitor;
 use crate::compiler::token::TokenType;
+use std::cell::RefCell;
 
 pub struct Interpreter {
     // Interpreter state will go here
-    env: std::cell::RefCell<Env>, // allows for us to mutate the environment by borrowing it mutably
+    env: RefCell<EnvRef>, // allows for us to mutate the environment by borrowing it mutably
 }
 
 impl Interpreter {
     pub fn new() -> Self {
         Interpreter {
-            env: std::cell::RefCell::new(Env::new()),
+            env: RefCell::new(Env::new_global()),
         }
     }
 
@@ -40,16 +42,30 @@ impl Interpreter {
 }
 
 impl StmtVisitor<Result<Object>> for Interpreter {
-    fn visit_var(&self, var: &super::stmt::Var) -> Result<Object> {
-        let value = var.initializer.accept(self)?;
-        self.env.borrow_mut().define(var.name.lexeme.clone(), value);
+    fn visit_block(&self, block: &super::stmt::Block) -> Result<Object> {
+        // update env
+        let prev = self.env.borrow().clone(); // save current env
+        let new_env = Env::new_enclosed(prev.clone());
+        self.env.replace(new_env);
+
+        for statement in &block.statements {
+            statement.accept(self)?;
+        }
+
+        self.env.replace(prev);
         Ok(Object::Nil)
     }
 
-    fn visit_expression(
-        &self,
-        expression: &super::stmt::Expression,
-    ) -> Result<Object> {
+    fn visit_var(&self, var: &super::stmt::Var) -> Result<Object> {
+        let value = var.initializer.accept(self)?;
+        self.env
+            .borrow() //immutable borrow for reading the environment
+            .borrow_mut() //mutable borrow for the environment inside pointer
+            .define(var.name.lexeme.clone(), value);
+        Ok(Object::Nil)
+    }
+
+    fn visit_expression(&self, expression: &super::stmt::Expression) -> Result<Object> {
         Ok(expression.expression.accept(self)?)
     }
 
@@ -64,17 +80,22 @@ impl ExprVisitor<Result<Object>> for Interpreter {
     fn visit_assign(&self, assign: &super::expr::Assign) -> Result<Object> {
         let value = assign.value.accept(self)?;
         let cloned_value = value.clone();
-        self.env.borrow_mut().assign(&assign.name, value)?;
+        self.env.borrow().borrow_mut().assign(&assign.name, value)?;
         Ok(cloned_value)
     }
 
     fn visit_variable(&self, variable: &super::expr::Variable) -> Result<Object> {
-        match self.env.borrow().get(&variable.name.lexeme, &variable.name) {
+        match self
+            .env
+            .borrow()
+            .borrow()
+            .get(&variable.name.lexeme, &variable.name)
+        {
             Ok(obj) => Ok(obj),
             Err(e) => Err(LoxError::new_runtime(
                 variable.name.clone(),
-                &format!("Undefined variable '{}'.", variable.name.lexeme)
-            ))
+                &format!("Undefined variable '{}'.", variable.name.lexeme),
+            )),
         }
     }
 
