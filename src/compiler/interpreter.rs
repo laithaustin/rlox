@@ -87,6 +87,24 @@ impl StmtVisitor<Result<Object>> for Interpreter {
 }
 
 impl ExprVisitor<Result<Object>> for Interpreter {
+    fn visit_logical(&self, logical: &super::expr::Logical) -> Result<Object> {
+        // need to short circuit after evaluating left
+        let left = logical.left.accept(self)?;
+        if logical.operator.token_type == TokenType::OR {
+            if Interpreter::is_truthy(left.clone()) {
+                Ok(left)
+            } else {
+                logical.right.accept(self)
+            }
+        } else {
+            if !Interpreter::is_truthy(left.clone()) {
+                Ok(left)
+            } else {
+                logical.right.accept(self)
+            }
+        }
+    }
+
     fn visit_assign(&self, assign: &super::expr::Assign) -> Result<Object> {
         let value = assign.value.accept(self)?;
         let cloned_value = value.clone();

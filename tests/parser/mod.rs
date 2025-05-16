@@ -2,6 +2,7 @@
 mod block_scoping_tests;
 mod error_reporting;
 mod if_statements;
+mod logical_operators;
 mod runtime_errors;
 
 use crate::common::TestErrorReporter;

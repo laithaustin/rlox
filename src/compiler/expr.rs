@@ -20,6 +20,7 @@ pub enum Expr {
     Ternary(Box<Ternary>),
     Variable(Box<Variable>),
     Assign(Box<Assign>),
+    Logical(Box<Logical>),
 }
 
 impl Expr {
@@ -32,6 +33,7 @@ impl Expr {
             Expr::Ternary(t) => visitor.visit_ternary(t),
             Expr::Variable(v) => visitor.visit_variable(v),
             Expr::Assign(a) => visitor.visit_assign(a),
+            Expr::Logical(l) => visitor.visit_logical(l),
         }
     }
 }
@@ -45,6 +47,7 @@ pub trait ExprVisitor<T> {
     fn visit_ternary(&self, ternary: &Ternary) -> T;
     fn visit_variable(&self, variable: &Variable) -> T;
     fn visit_assign(&self, assign: &Assign) -> T;
+    fn visit_logical(&self, logical: &Logical) -> T;
 }
 
 #[derive(Debug, Clone)]
@@ -86,4 +89,11 @@ pub struct Variable {
 pub struct Assign {
     pub name: Token,
     pub value: Box<Expr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Logical {
+    pub left: Box<Expr>,
+    pub operator: Token,
+    pub right: Box<Expr>,
 }

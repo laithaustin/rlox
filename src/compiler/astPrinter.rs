@@ -13,6 +13,15 @@ use crate::compiler::expr::{Binary, Grouping, Literal, Ternary, Unary, Variable}
 pub struct AstPrinter;
 
 impl ExprVisitor<String> for AstPrinter {
+    fn visit_logical(&self, logical: &super::expr::Logical) -> String {
+        format!(
+            "({:?} {:?} {:?})",
+            logical.left.accept(self),
+            logical.operator.lexeme,
+            logical.right.accept(self)
+        )
+    }
+
     fn visit_assign(&self, assign: &super::expr::Assign) -> String {
         format!(
             "({:?} : {:?})",

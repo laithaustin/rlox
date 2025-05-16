@@ -1,5 +1,5 @@
 use crate::compiler::expr::{
-    Assign, Binary, Expr, Grouping, Literal, Object, Ternary, Unary, Variable,
+    Assign, Binary, Expr, Grouping, Literal, Logical, Object, Ternary, Unary, Variable,
 };
 use crate::compiler::stmt::{Block, Expression, IfStmt, Print, Stmt, Var};
 use crate::compiler::token::TokenType;
@@ -14,7 +14,9 @@ use crate::compiler::{ErrorReporter, LoxError, Result, Token};
 // block -> "{" declaration* "}" ;
 // printStmt -> "print" expression ";"
 // exprStmt -> expression ";"
-// expression -> IDENTIFIER "=" expression | equality;
+// expression -> IDENTIFIER "=" expression | logic_or;
+// logic_or -> logic_and ("or" logic_and)*;
+// logic_and -> equality ("and" equality)*;
 // equality -> ternary ( ( "!=" | "==" ) ternary)*;
 // ternary -> comparison ( ("?") expression (":") ternary)*; //NOTE: ternary operator is RIGHT
 // comparison -> term ( ( ">" | ">=" | "<" | "<=" ) term )*;
@@ -40,7 +42,7 @@ impl<'a> Parser<'a> {
 
     // implementing the grammar rules as methods
     pub fn expression(&mut self) -> Result<Expr> {
-        let lval = self.equality()?; // get left expression
+        let lval = self.logic_or()?; // get left expression
 
         if self.match_token(&[TokenType::EQUAL]) {
             let equals: Token = self.previous().clone();
@@ -202,6 +204,38 @@ impl<'a> Parser<'a> {
         Ok(Stmt::Expression(Box::new(Expression {
             expression: Box::new(expr),
         })))
+    }
+
+    pub fn logic_or(&mut self) -> Result<Expr> {
+        let mut expr = self.logic_and()?;
+
+        while self.match_token(&[TokenType::OR]) {
+            let operator = self.previous().clone();
+            let right = self.logic_and()?;
+            expr = Expr::Logical(Box::new(Logical {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(right),
+            }));
+        }
+
+        Ok(expr)
+    }
+
+    pub fn logic_and(&mut self) -> Result<Expr> {
+        let mut expr = self.equality()?;
+
+        while self.match_token(&[TokenType::AND]) {
+            let operator = self.previous().clone();
+            let right = self.equality()?;
+            expr = Expr::Logical(Box::new(Logical {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(right),
+            }));
+        }
+
+        Ok(expr)
     }
 
     pub fn equality(&mut self) -> Result<Expr> {
