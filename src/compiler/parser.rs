@@ -43,7 +43,7 @@ impl<'a> Parser<'a> {
         let lval = self.equality()?; // get left expression
 
         if self.match_token(&[TokenType::EQUAL]) {
-            let equals: Token = self.advance()?.clone();
+            let equals: Token = self.previous().clone();
             let val: Expr = self.expression()?;
 
             // check if lval is a variable type expression
@@ -61,13 +61,10 @@ impl<'a> Parser<'a> {
     }
 
     pub fn if_statement(&mut self) -> Result<Stmt> {
-        self.advance()?; // consume the if
-
         if self.match_token(&[TokenType::LPAREN]) {
-            self.advance()?; // consume left paren
+            // Left paren already consumed by match_token
             let cond = self.expression()?;
-            // peek next token
-            println!("Next token: {:?}", self.peek());
+            // We've parsed the condition, now check for closing parenthesis
 
             if !self.match_token(&[TokenType::RPAREN]) {
                 let current_token = self.peek().clone();
@@ -76,13 +73,12 @@ impl<'a> Parser<'a> {
                     "Expected ')' after condition.",
                 ));
             }
+            // Right paren already consumed by match_token above
 
-            self.advance()?; // consume right paren
             let body = self.statement()?;
 
             // check for else condition
             let else_branch = if self.match_token(&[TokenType::ELSE]) {
-                self.advance()?; // consume else
                 Some(self.statement()?)
             } else {
                 None
@@ -103,7 +99,6 @@ impl<'a> Parser<'a> {
     }
 
     pub fn block(&mut self) -> Result<Stmt> {
-        self.advance()?; // consume '{'
         let mut stmts: Vec<Stmt> = Vec::new();
 
         while !self.check(&TokenType::RBRACE) && !self.is_at_end() {
@@ -118,26 +113,30 @@ impl<'a> Parser<'a> {
                 "Expected '}' after block.",
             ));
         }
-        self.advance()?; // consume '}'
         Ok(Stmt::Block(Box::new(Block { statements: stmts })))
     }
 
     pub fn declaration(&mut self) -> Result<Stmt> {
         if self.match_token(&[TokenType::VAR]) {
-            let var_stmt = self.var_declar()?;
-            return Ok(var_stmt);
+            return self.var_declar();
         }
         self.statement()
     }
 
     pub fn var_declar(&mut self) -> Result<Stmt> {
-        self.advance()?; // consume var
+        // 'var' already consumed by match_token in declaration()
 
-        let token = self.advance()?; // consumes the identifier
-        let name = token.clone();
+        if !self.match_token(&[TokenType::IDENTIFIER]) {
+            let current_token = self.peek().clone();
+            return Err(LoxError::new_parse(
+                current_token,
+                "Expected variable name.",
+            ));
+        }
+        let name = self.previous().clone();
 
         let initializer = if self.match_token(&[TokenType::EQUAL]) {
-            self.advance()?; // consume "="
+            // "=" already consumed by match_token
             let expr = self.expression()?;
             Box::new(expr)
         } else {
@@ -151,7 +150,7 @@ impl<'a> Parser<'a> {
             ));
         }
 
-        self.advance()?; //consume
+        // Semicolon already consumed by match_token above
         Ok(Stmt::Var(Box::new(Var {
             name: Box::new(name),
             initializer,
@@ -160,7 +159,7 @@ impl<'a> Parser<'a> {
 
     pub fn statement(&mut self) -> Result<Stmt> {
         if self.match_token(&[TokenType::PRINT]) {
-            self.advance()?; //consume print
+            // Print token already consumed by match_token
             return self.print_expression();
         } else if self.match_token(&[TokenType::LBRACE]) {
             return self.block();
@@ -182,7 +181,7 @@ impl<'a> Parser<'a> {
             ));
         }
 
-        self.advance()?; // consume semicolon
+        // Semicolon already consumed by match_token above
 
         Ok(Stmt::Print(Box::new(Print {
             expression: Box::new(expr),
@@ -190,7 +189,15 @@ impl<'a> Parser<'a> {
     }
     pub fn expression_statement(&mut self) -> Result<Stmt> {
         let expr: Expr = self.expression()?;
-        self.advance()?; //consume semicolon
+
+        if !self.match_token(&[TokenType::SEMICOLON]) {
+            let current_token = self.peek().clone();
+            return Err(LoxError::new_parse(
+                current_token,
+                "Expected ';' after expression.",
+            ));
+        }
+        // Semicolon already consumed by match_token above
 
         Ok(Stmt::Expression(Box::new(Expression {
             expression: Box::new(expr),
@@ -201,7 +208,7 @@ impl<'a> Parser<'a> {
         // Implementation for equality parsing will go here
         let mut expr: Expr = self.ternary()?;
         while self.match_token(&[TokenType::BANG_EQUAL, TokenType::EQUAL_EQUAL]) {
-            let operator: Token = self.advance()?.clone();
+            let operator: Token = self.previous().clone();
             let right = self.ternary()?;
             // Create a Binary expression node wrapped in Expr enum
             expr = Expr::Binary(Box::new(Binary {
@@ -218,13 +225,13 @@ impl<'a> Parser<'a> {
         // ternary -> comparison ( ("?") expression (":") ternary)*;
         let mut expr: Expr = self.comparison()?;
         while self.match_token(&[TokenType::QUEST]) {
-            let quest_token = self.advance()?.clone(); // consume '?'
+            let quest_token = self.previous().clone(); // Get '?'
             let left = self.expression()?; // parse the left expression
             // check for ':' token
             if !self.match_token(&[TokenType::COLON]) {
                 return Err(LoxError::new_parse(quest_token, "Expected ':' after '?'"));
             }
-            self.advance()?; // consume ':'
+            // Colon already consumed by match_token above
             let right = self.ternary()?; // parse the right expression
             expr = Expr::Ternary(Box::new(Ternary {
                 condition: Box::new(expr),
@@ -249,7 +256,7 @@ impl<'a> Parser<'a> {
             TokenType::LESS,
             TokenType::LESS_EQUAL,
         ]) {
-            let operator: Token = self.advance()?.clone(); // Get the operator token
+            let operator: Token = self.previous().clone(); // Get the operator token
             let right = self.term()?; // Get the next term
 
             // Create a Binary expression node wrapped in Expr enum
@@ -268,7 +275,7 @@ impl<'a> Parser<'a> {
 
         let mut expr: Expr = self.factor()?;
         while self.match_token(&[TokenType::MINUS, TokenType::PLUS]) {
-            let operator: Token = self.advance()?.clone(); // Get the operator token
+            let operator: Token = self.previous().clone(); // Get the operator token
             let right = self.factor()?; // Get the next factor
 
             // Create a Binary expression node wrapped in Expr enum
@@ -287,7 +294,7 @@ impl<'a> Parser<'a> {
 
         let mut expr: Expr = self.unary()?;
         while self.match_token(&[TokenType::SLASH, TokenType::STAR]) {
-            let operator: Token = self.advance()?.clone(); // Get the operator token
+            let operator: Token = self.previous().clone(); // Get the operator token
             let right = self.unary()?; // Get the next unary expression
 
             // Create a Binary expression node wrapped in Expr enum
@@ -305,7 +312,7 @@ impl<'a> Parser<'a> {
         // unary -> ( "!" | "-" ) unary | primary;
 
         if self.match_token(&[TokenType::BANG, TokenType::MINUS]) {
-            let operator: Token = self.advance()?.clone(); // Get the operator token
+            let operator: Token = self.previous().clone(); // Get the operator token
             let right = self.unary()?; // Get the next unary expression
 
             // Create a Unary expression node wrapped in Expr enum
@@ -322,7 +329,7 @@ impl<'a> Parser<'a> {
     pub fn primary(&mut self) -> Result<Expr> {
         // primary -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | identifier;
         if self.match_token(&[TokenType::NUMBER, TokenType::STRING]) {
-            let token: Token = self.advance()?.clone(); // Get the token
+            let token: Token = self.previous().clone(); // Get the token
             // Create a Literal expression node wrapped in Expr enum
             match token.token_type {
                 TokenType::NUMBER => {
@@ -359,28 +366,28 @@ impl<'a> Parser<'a> {
         }
 
         if self.match_token(&[TokenType::TRUE]) {
-            self.advance()?; // Consume the token
+            // Token already consumed by match_token
             return Ok(Expr::Literal(Literal {
                 value: Object::Boolean(true), // Wrap in Object::Bool
             }));
         }
 
         if self.match_token(&[TokenType::FALSE]) {
-            self.advance()?; // Consume the token
+            // Token already consumed by match_token
             return Ok(Expr::Literal(Literal {
                 value: Object::Boolean(false), // Wrap in Object::Bool
             }));
         }
 
         if self.match_token(&[TokenType::NIL]) {
-            self.advance()?; // Consume the token
+            // Token already consumed by match_token
             return Ok(Expr::Literal(Literal {
                 value: Object::Nil, // Wrap in Object::Nil
             }));
         }
 
         if self.match_token(&[TokenType::LPAREN]) {
-            let lparen_token = self.advance()?.clone(); // Consume '('
+            let lparen_token = self.previous().clone(); // Get '('
             let expr = self.expression()?; // Parse the inner expression
 
             if !self.match_token(&[TokenType::RPAREN]) {
@@ -389,7 +396,7 @@ impl<'a> Parser<'a> {
                     "Expected closing parenthesis",
                 ));
             }
-            self.advance()?; // Consume ')'
+            // Right paren already consumed by match_token above
 
             return Ok(Expr::Grouping(Box::new(Grouping {
                 expression: Box::new(expr),
@@ -397,15 +404,8 @@ impl<'a> Parser<'a> {
         }
 
         if self.match_token(&[TokenType::IDENTIFIER]) {
-            let expr_token = self.advance()?.clone();
-            return Ok(Expr::Variable(Box::new(Variable {
-                name: Token::new(
-                    TokenType::IDENTIFIER,
-                    expr_token.lexeme,
-                    expr_token.line,
-                    expr_token.literal,
-                ),
-            })));
+            let expr_token = self.previous().clone();
+            return Ok(Expr::Variable(Box::new(Variable { name: expr_token })));
         }
 
         // If none of the above, it's an error
@@ -422,16 +422,28 @@ impl<'a> Parser<'a> {
         Ok(statements)
     }
 
-    pub fn match_token(&self, token_types: &[TokenType]) -> bool {
+    /// Checks if the current token matches any of the given types.
+    /// If it does, consumes the token and returns true. Otherwise, returns false.
+    ///
+    /// This method both tests AND consumes the token if there's a match,
+    /// so there's no need to call advance() after a successful match.
+    pub fn match_token(&mut self, token_types: &[TokenType]) -> bool {
         for token_type in token_types {
             if self.check(token_type) {
+                // Advance the token position safely, even if at the end
+                if !self.is_at_end() {
+                    self.current += 1;
+                }
                 return true;
             }
         }
         false
     }
 
-    pub fn previous(&mut self) -> &Token {
+    /// Returns the most recently consumed token.
+    /// Useful for accessing tokens after they've been matched and consumed.
+    pub fn previous(&self) -> &Token {
+        // Return the previous token (the one we just consumed)
         &self.tokens[self.current - 1]
     }
 
@@ -451,7 +463,6 @@ impl<'a> Parser<'a> {
             return Err(LoxError::new_parse(eof_token, "Unexpected end of input"));
         }
         self.current += 1;
-        // let's debug print the current token
         Ok(&self.tokens[self.current - 1])
     }
 
