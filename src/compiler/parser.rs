@@ -1,7 +1,7 @@
 use crate::compiler::expr::{
     Assign, Binary, Expr, Grouping, Literal, Object, Ternary, Unary, Variable,
 };
-use crate::compiler::stmt::{Block, Expression, Print, Stmt, Var};
+use crate::compiler::stmt::{Block, Expression, IfStmt, Print, Stmt, Var};
 use crate::compiler::token::TokenType;
 use crate::compiler::{ErrorReporter, LoxError, Result, Token};
 
@@ -9,7 +9,8 @@ use crate::compiler::{ErrorReporter, LoxError, Result, Token};
 // program -> declaration* EOF
 // declaration -> varStmt | statement
 // varStmt -> "var" identifier ("=" expression)? ";"
-// statement -> printStmt | exprStmt | block ";"
+// statement -> printStmt | exprStmt | ifStmt | block ";"
+// ifStmt -> if "(" expression ")" statement ( else statement )? ";"
 // block -> "{" declaration* "}" ;
 // printStmt -> "print" expression ";"
 // exprStmt -> expression ";"
@@ -57,6 +58,48 @@ impl<'a> Parser<'a> {
         }
 
         Ok(lval)
+    }
+
+    pub fn if_statement(&mut self) -> Result<Stmt> {
+        self.advance()?; // consume the if
+
+        if self.match_token(&[TokenType::LPAREN]) {
+            self.advance()?; // consume left paren
+            let cond = self.expression()?;
+            // peek next token
+            println!("Next token: {:?}", self.peek());
+
+            if !self.match_token(&[TokenType::RPAREN]) {
+                let current_token = self.peek().clone();
+                return Err(LoxError::new_parse(
+                    current_token,
+                    "Expected ')' after condition.",
+                ));
+            }
+
+            self.advance()?; // consume right paren
+            let body = self.statement()?;
+
+            // check for else condition
+            let else_branch = if self.match_token(&[TokenType::ELSE]) {
+                self.advance()?; // consume else
+                Some(self.statement()?)
+            } else {
+                None
+            };
+
+            Ok(Stmt::IfStmt(Box::new(IfStmt {
+                condition: Box::new(cond),
+                then_branch: Box::new(body),
+                else_branch: else_branch.map(|stmt| Box::new(stmt)),
+            })))
+        } else {
+            let current_token = self.peek().clone();
+            return Err(LoxError::new_parse(
+                current_token,
+                "Expected '(' after 'if'.",
+            ));
+        }
     }
 
     pub fn block(&mut self) -> Result<Stmt> {
@@ -121,6 +164,8 @@ impl<'a> Parser<'a> {
             return self.print_expression();
         } else if self.match_token(&[TokenType::LBRACE]) {
             return self.block();
+        } else if self.match_token(&[TokenType::IF]) {
+            return self.if_statement();
         } else {
             self.expression_statement()
         }

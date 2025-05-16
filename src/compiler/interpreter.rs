@@ -42,6 +42,16 @@ impl Interpreter {
 }
 
 impl StmtVisitor<Result<Object>> for Interpreter {
+    fn visit_if_stmt(&self, if_stmt: &super::stmt::IfStmt) -> Result<Object> {
+        let cond = if_stmt.condition.accept(self)?;
+        if Interpreter::is_truthy(cond) {
+            if_stmt.then_branch.accept(self)?;
+        } else if let Some(else_branch) = &if_stmt.else_branch {
+            else_branch.accept(self)?;
+        }
+        Ok(Object::Nil)
+    }
+
     fn visit_block(&self, block: &super::stmt::Block) -> Result<Object> {
         // update env
         let prev = self.env.borrow().clone(); // save current env

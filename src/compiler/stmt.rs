@@ -8,6 +8,7 @@ pub enum Stmt {
     Print(Box<Print>),
     Var(Box<Var>),
     Block(Box<Block>),
+    IfStmt(Box<IfStmt>),
 }
 
 pub trait StmtVisitor<T> {
@@ -15,6 +16,7 @@ pub trait StmtVisitor<T> {
     fn visit_print(&self, print: &Print) -> T;
     fn visit_var(&self, var: &Var) -> T;
     fn visit_block(&self, block: &Block) -> T;
+    fn visit_if_stmt(&self, if_stmt: &IfStmt) -> T;
 }
 
 impl Stmt {
@@ -24,6 +26,7 @@ impl Stmt {
             Stmt::Print(b) => visitor.visit_print(b),
             Stmt::Var(b) => visitor.visit_var(b),
             Stmt::Block(b) => visitor.visit_block(b),
+            Stmt::IfStmt(b) => visitor.visit_if_stmt(b),
         }
     }
 }
@@ -47,4 +50,11 @@ pub struct Print {
 #[derive(Debug, Clone)]
 pub struct Block {
     pub statements: Vec<Stmt>,
+}
+
+#[derive(Debug, Clone)]
+pub struct IfStmt {
+    pub condition: Box<Expr>,
+    pub then_branch: Box<Stmt>,
+    pub else_branch: Option<Box<Stmt>>,
 }
