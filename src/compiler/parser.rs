@@ -11,7 +11,8 @@ use crate::compiler::{ErrorReporter, LoxError, Result, Token};
 // program -> declaration* EOF
 // declaration -> varStmt | statement
 // varStmt -> "var" identifier ("=" expression)? ";"
-// statement -> printStmt | exprStmt | whileStmt | ifStmt | block ";"
+// statement -> printStmt | exprStmt | whileStmt | forStmt | ifStmt | block ";"
+// forStmt -> "for" "(" (exprStmt | varStmt | ";") expression? ";" expression? ")" statement ";"
 // whileStmt -> "while" "(" expression ")" statement ";"
 // ifStmt -> if "(" expression ")" statement ( else statement )? ";"
 // block -> "{" declaration* "}" ;
@@ -63,6 +64,104 @@ impl<'a> Parser<'a> {
         }
 
         Ok(lval)
+    }
+
+    pub fn for_statement(&mut self) -> Result<Stmt> {
+        // let's implement this via desugaring
+        if self.match_token(&[TokenType::LPAREN]) {
+            let initializer = match self.peek().token_type {
+                TokenType::SEMICOLON => {
+                    // consume semicolon
+                    if !self.match_token(&[TokenType::SEMICOLON]) {
+                        return Err(LoxError::new_parse(
+                            self.peek().clone(),
+                            "Expected ';' after for increment expression.",
+                        ));
+                    } else {
+                        None
+                    }
+                }
+                TokenType::VAR => {
+                    let _ = self.advance();
+                    Some(self.var_declar())
+                }
+                _ => Some(self.expression_statement()),
+            };
+
+            let cond = match self.peek().token_type {
+                TokenType::SEMICOLON => None,
+                _ => Some(self.expression()?),
+            };
+            // consume semicolon
+            if !self.match_token(&[TokenType::SEMICOLON]) {
+                return Err(LoxError::new_parse(
+                    self.peek().clone(),
+                    "Expected ';' after for increment expression.",
+                ));
+            }
+
+            let inc = match self.peek().token_type {
+                TokenType::RPAREN => None,
+                _ => Some(self.expression()?),
+            };
+
+            if !self.match_token(&[TokenType::RPAREN]) {
+                let current_token = self.peek().clone();
+                return Err(LoxError::new_parse(
+                    current_token,
+                    "Expected ')' after for clauses.",
+                ));
+            }
+
+            let body = self.statement()?;
+
+            // append body and inc
+            let body_inc: Stmt;
+            if let Some(inc) = inc {
+                body_inc = Stmt::Block(Box::new(Block {
+                    statements: vec![
+                        body,
+                        Stmt::Expression(Box::new(Expression {
+                            expression: Box::new(inc),
+                        })),
+                    ],
+                }));
+            } else {
+                body_inc = Stmt::Block(Box::new(Block {
+                    statements: vec![body],
+                }));
+            }
+
+            // generate while body
+            let while_body: Stmt;
+            if let Some(cond) = cond {
+                while_body = Stmt::WhileStmt(Box::new(WhileStmt {
+                    condition: Box::new(cond),
+                    body: Box::new(body_inc),
+                }));
+            } else {
+                while_body = Stmt::WhileStmt(Box::new(WhileStmt {
+                    condition: Box::new(Expr::Literal(Literal {
+                        value: Object::Boolean(true),
+                    })),
+                    body: Box::new(body_inc),
+                }));
+            }
+
+            // combine initializer and while
+            if let Some(initializer) = initializer {
+                Ok(Stmt::Block(Box::new(Block {
+                    statements: vec![initializer?, while_body],
+                })))
+            } else {
+                Ok(while_body)
+            }
+        } else {
+            Err(LoxError::new_parse(
+                self.peek().clone(),
+                "Expected '(' after 'for'.",
+            ))
+        }
     }
 
     pub fn while_statement(&mut self) -> Result<Stmt> {
@@ -197,6 +296,8 @@ impl<'a> Parser<'a> {
             return self.block();
         } else if self.match_token(&[TokenType::WHILE]) {
             return self.while_statement();
+        } else if self.match_token(&[TokenType::FOR]) {
+            return self.for_statement();
         } else if self.match_token(&[TokenType::IF]) {
             return self.if_statement();
         } else {
