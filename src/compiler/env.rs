@@ -39,15 +39,25 @@ impl Env {
     }
 
     pub fn assign(&mut self, name: &Token, value: Object) -> Result<&Object> {
-        // key difference to define is that we error out if bindings don't exist
-        if !self.bindings.contains_key(&name.lexeme) {
-            return Err(LoxError::new_runtime(
-                name.clone(),
-                &format!("Undefined variable '{}'.", name.lexeme),
-            ));
+        // Check if the variable exists in the current environment
+        if self.bindings.contains_key(&name.lexeme) {
+            self.bindings.insert(name.lexeme.clone(), value);
+            return Ok(&self.bindings[&name.lexeme]);
         }
-        self.bindings.insert(name.lexeme.clone(), value);
-        Ok(&self.bindings[&name.lexeme])
+        
+        // If not in current environment, check in enclosing environments
+        match &self.enclosing {
+            Some(enclosed) => {
+                enclosed.borrow_mut().assign(name, value)?;
+                // Return a reference to the value in this environment 
+                // (this is slightly inconsistent since the value is actually in the parent)
+                Ok(&self.bindings.get(&name.lexeme).unwrap_or(&Object::Nil))
+            }
+            None => Err(LoxError::new_runtime(
+                name.clone(),
+                &format!("Undefined variable '{}' during assign.", name.lexeme),
+            )),
+        }
     }
 
     pub fn define(&mut self, name: String, value: Object) {
@@ -63,7 +73,7 @@ impl Env {
                     Some(enclosed) => enclosed.borrow().get(name, token),
                     None => Err(LoxError::new_runtime(
                         token.clone(),
-                        &format!("Undefined variable '{}'.", name),
+                        &format!("Undefined variable '{}' during get.", name),
                     )),
                 }
             }
