@@ -1,7 +1,9 @@
+use std::sync::Condvar;
+
 use crate::compiler::expr::{
     Assign, Binary, Expr, Grouping, Literal, Logical, Object, Ternary, Unary, Variable,
 };
-use crate::compiler::stmt::{Block, Expression, IfStmt, Print, Stmt, Var};
+use crate::compiler::stmt::{Block, Expression, IfStmt, Print, Stmt, Var, WhileStmt};
 use crate::compiler::token::TokenType;
 use crate::compiler::{ErrorReporter, LoxError, Result, Token};
 
@@ -9,7 +11,8 @@ use crate::compiler::{ErrorReporter, LoxError, Result, Token};
 // program -> declaration* EOF
 // declaration -> varStmt | statement
 // varStmt -> "var" identifier ("=" expression)? ";"
-// statement -> printStmt | exprStmt | ifStmt | block ";"
+// statement -> printStmt | exprStmt | whileStmt | ifStmt | block ";"
+// whileStmt -> "while" "(" expression ")" statement ";"
 // ifStmt -> if "(" expression ")" statement ( else statement )? ";"
 // block -> "{" declaration* "}" ;
 // printStmt -> "print" expression ";"
@@ -60,6 +63,33 @@ impl<'a> Parser<'a> {
         }
 
         Ok(lval)
+    }
+
+    pub fn while_statement(&mut self) -> Result<Stmt> {
+        if self.match_token(&[TokenType::LPAREN]) {
+            let cond = self.expression()?;
+
+            if !self.match_token(&[TokenType::RPAREN]) {
+                let current_token = self.peek().clone();
+                return Err(LoxError::new_parse(
+                    current_token,
+                    "Expected ')' after condition.",
+                ));
+            }
+
+            let body = self.statement()?;
+
+            Ok(Stmt::WhileStmt(Box::new(WhileStmt {
+                condition: Box::new(cond),
+                body: Box::new(body),
+            })))
+        } else {
+            let current_token = self.peek().clone();
+            return Err(LoxError::new_parse(
+                current_token,
+                "Expected '(' after 'while'.",
+            ));
+        }
     }
 
     pub fn if_statement(&mut self) -> Result<Stmt> {
@@ -165,6 +195,8 @@ impl<'a> Parser<'a> {
             return self.print_expression();
         } else if self.match_token(&[TokenType::LBRACE]) {
             return self.block();
+        } else if self.match_token(&[TokenType::WHILE]) {
+            return self.while_statement();
         } else if self.match_token(&[TokenType::IF]) {
             return self.if_statement();
         } else {

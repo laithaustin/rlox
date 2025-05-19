@@ -42,6 +42,13 @@ impl Interpreter {
 }
 
 impl StmtVisitor<Result<Object>> for Interpreter {
+    fn visit_while_stmt(&self, while_stmt: &super::stmt::WhileStmt) -> Result<Object> {
+        while Interpreter::is_truthy(while_stmt.condition.accept(self)?) {
+            while_stmt.body.accept(self)?;
+        }
+        Ok(Object::Nil)
+    }
+
     fn visit_if_stmt(&self, if_stmt: &super::stmt::IfStmt) -> Result<Object> {
         let cond = if_stmt.condition.accept(self)?;
         if Interpreter::is_truthy(cond) {
@@ -122,7 +129,10 @@ impl ExprVisitor<Result<Object>> for Interpreter {
             Ok(obj) => Ok(obj),
             Err(e) => Err(LoxError::new_runtime(
                 variable.name.clone(),
-                &format!("Undefined variable '{}'.", variable.name.lexeme),
+                &format!(
+                    "Undefined variable '{}' during visit.",
+                    variable.name.lexeme
+                ),
             )),
         }
     }

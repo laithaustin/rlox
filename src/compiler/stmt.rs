@@ -9,6 +9,7 @@ pub enum Stmt {
     Var(Box<Var>),
     Block(Box<Block>),
     IfStmt(Box<IfStmt>),
+    WhileStmt(Box<WhileStmt>),
 }
 
 pub trait StmtVisitor<T> {
@@ -17,6 +18,7 @@ pub trait StmtVisitor<T> {
     fn visit_var(&self, var: &Var) -> T;
     fn visit_block(&self, block: &Block) -> T;
     fn visit_if_stmt(&self, if_stmt: &IfStmt) -> T;
+    fn visit_while_stmt(&self, while_stmt: &WhileStmt) -> T;
 }
 
 impl Stmt {
@@ -27,6 +29,7 @@ impl Stmt {
             Stmt::Var(b) => visitor.visit_var(b),
             Stmt::Block(b) => visitor.visit_block(b),
             Stmt::IfStmt(b) => visitor.visit_if_stmt(b),
+            Stmt::WhileStmt(b) => visitor.visit_while_stmt(b),
         }
     }
 }
@@ -57,4 +60,10 @@ pub struct IfStmt {
     pub condition: Box<Expr>,
     pub then_branch: Box<Stmt>,
     pub else_branch: Option<Box<Stmt>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct WhileStmt {
+    pub condition: Box<Expr>,
+    pub body: Box<Stmt>,
 }
