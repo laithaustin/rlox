@@ -43,7 +43,7 @@ impl Lox {
         }
 
         // second phase: parse the tokens
-        let mut parser = Parser::new(&scanner.tokens, self);
+        let mut parser = Parser::new(&scanner.tokens);
         match parser.parse() {
             Ok(ast) => {
                 let mut interpreter = Interpreter::new();

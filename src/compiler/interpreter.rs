@@ -94,6 +94,31 @@ impl StmtVisitor<Result<Object>> for Interpreter {
 }
 
 impl ExprVisitor<Result<Object>> for Interpreter {
+    fn visit_call(&self, call: &super::expr::Call) -> Result<Object> {
+        let callee = call.callee.accept(self)?;
+        let args = call
+            .args
+            .iter()
+            .map(|arg| arg.accept(self))
+            .collect::<Result<Vec<Object>>>()?;
+        match callee {
+            Object::Function(function) => {
+                // Check arity first
+                if args.len() != function.arity() {
+                    return Err(LoxError::new_runtime(
+                        call.paren.clone(),
+                        &format!("Expected {} arguments but got {}.", function.arity(), args.len()),
+                    ));
+                }
+                function.call(self, &args)
+            },
+            _ => Err(LoxError::new_runtime(
+                call.paren.clone(),
+                "Can only call functions.",
+            )),
+        }
+    }
+
     fn visit_logical(&self, logical: &super::expr::Logical) -> Result<Object> {
         // need to short circuit after evaluating left
         let left = logical.left.accept(self)?;
@@ -127,7 +152,7 @@ impl ExprVisitor<Result<Object>> for Interpreter {
             .get(&variable.name.lexeme, &variable.name)
         {
             Ok(obj) => Ok(obj),
-            Err(e) => Err(LoxError::new_runtime(
+            Err(_) => Err(LoxError::new_runtime(
                 variable.name.clone(),
                 &format!(
                     "Undefined variable '{}' during visit.",
@@ -143,6 +168,7 @@ impl ExprVisitor<Result<Object>> for Interpreter {
             Object::String(ref s) => Ok(Object::String(s.clone())),
             Object::Boolean(b) => Ok(Object::Boolean(b)),
             Object::Nil => Ok(Object::Nil),
+            Object::Function(ref f) => Ok(Object::Function(f.clone())),
             // Use a dummy token since Literal has no operator
             Object::Error(ref msg) => {
                 use crate::compiler::token::{Token, TokenType};

@@ -19,7 +19,7 @@ fn parse_source(source: &str) -> (Option<Vec<Stmt>>, TestErrorReporter) {
     let mut scanner = Scanner::new(source.to_string(), &mut reporter);
     scanner.scan_tokens();
     
-    let mut parser = Parser::new(&scanner.tokens, &mut reporter);
+    let mut parser = Parser::new(&scanner.tokens);
     let result = parser.parse();
     
     (result.ok(), reporter)
@@ -53,7 +53,7 @@ fn test_parse_print_statement() {
 //     let mut reporter = crate::common::TestErrorReporter::new();
 //     let mut scanner = Scanner::new(source.to_string(), &mut reporter);
 //     scanner.scan_tokens();
-//     let mut parser = Parser::new(&scanner.tokens, &mut reporter);
+//     let mut parser = Parser::new(&scanner.tokens);
 //     parser.parse()
 // }
 

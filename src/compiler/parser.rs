@@ -1,11 +1,9 @@
-use std::sync::Condvar;
-
 use crate::compiler::expr::{
-    Assign, Binary, Expr, Grouping, Literal, Logical, Object, Ternary, Unary, Variable,
+    Assign, Binary, Call, Expr, Grouping, Literal, Logical, Object, Ternary, Unary, Variable,
 };
 use crate::compiler::stmt::{Block, Expression, IfStmt, Print, Stmt, Var, WhileStmt};
 use crate::compiler::token::TokenType;
-use crate::compiler::{ErrorReporter, LoxError, Result, Token};
+use crate::compiler::{LoxError, Result, Token};
 
 // The essential grammar for lox is as follows (low to high precedence):
 // program -> declaration* EOF
@@ -26,21 +24,21 @@ use crate::compiler::{ErrorReporter, LoxError, Result, Token};
 // comparison -> term ( ( ">" | ">=" | "<" | "<=" ) term )*;
 // term -> factor ( ( "-" | "+" ) factor )*;
 // factor -> unary ( ( "/" | "*" ) unary )*;
-// unary -> ( "!" | "-" ) unary | primary;
+// unary -> ( "!" | "-" ) unary | call ;
+// call -> primary ( "(" arguments ")" ) ;
+// arguments -> expression ( "," expression )*;
 // primary -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | identifier ;
 
-pub struct Parser<'a> {
-    tokens: &'a Vec<Token>,
+pub struct Parser {
+    tokens: Vec<Token>,
     current: usize,
-    error_reporter: &'a mut dyn ErrorReporter,
 }
 
-impl<'a> Parser<'a> {
-    pub fn new(tokens: &'a Vec<Token>, error_reporter: &'a mut dyn ErrorReporter) -> Self {
+impl Parser {
+    pub fn new(tokens: &Vec<Token>) -> Self {
         Self {
-            tokens,
+            tokens: tokens.clone(),
             current: 0,
-            error_reporter,
         }
     }
 
@@ -72,17 +70,14 @@ impl<'a> Parser<'a> {
             let initializer = match self.peek().token_type {
                 TokenType::SEMICOLON => {
                     // consume semicolon
-                    if !self.match_token(&[TokenType::SEMICOLON]) {
-                        return Err(LoxError::new_parse(
-                            self.peek().clone(),
-                            "Expected ';' after for increment expression.",
-                        ));
-                    } else {
-                        None
-                    }
+                    self.consume(
+                        &TokenType::SEMICOLON,
+                        "Expect ';' after for initialization.",
+                    )?;
+                    None
                 }
                 TokenType::VAR => {
-                    let _ = self.advance();
+                    self.advance();
                     Some(self.var_declar())
                 }
                 _ => Some(self.expression_statement()),
@@ -93,25 +88,14 @@ impl<'a> Parser<'a> {
                 _ => Some(self.expression()?),
             };
             // consume semicolon
-            if !self.match_token(&[TokenType::SEMICOLON]) {
-                return Err(LoxError::new_parse(
-                    self.peek().clone(),
-                    "Expected ';' after for increment expression.",
-                ));
-            }
+            self.consume(&TokenType::SEMICOLON, "Expect ';' after for condition.")?;
 
             let inc = match self.peek().token_type {
                 TokenType::RPAREN => None,
                 _ => Some(self.expression()?),
             };
 
-            if !self.match_token(&[TokenType::RPAREN]) {
-                let current_token = self.peek().clone();
-                return Err(LoxError::new_parse(
-                    current_token,
-                    "Expected ')' after for clauses.",
-                ));
-            }
+            self.consume(&TokenType::RPAREN, "Expect ')' after for clauses.")?;
 
             let body = self.statement()?;
 
@@ -159,7 +143,7 @@ impl<'a> Parser<'a> {
         } else {
             Err(LoxError::new_parse(
                 self.peek().clone(),
-                "Expected '(' after 'for'.",
+                "Expect '(' after 'for'.",
             ))
         }
     }
@@ -167,14 +151,7 @@ impl<'a> Parser<'a> {
     pub fn while_statement(&mut self) -> Result<Stmt> {
         if self.match_token(&[TokenType::LPAREN]) {
             let cond = self.expression()?;
-
-            if !self.match_token(&[TokenType::RPAREN]) {
-                let current_token = self.peek().clone();
-                return Err(LoxError::new_parse(
-                    current_token,
-                    "Expected ')' after condition.",
-                ));
-            }
+            self.consume(&TokenType::RPAREN, "Expect ')' after condition.")?;
 
             let body = self.statement()?;
 
@@ -183,28 +160,21 @@ impl<'a> Parser<'a> {
                 body: Box::new(body),
             })))
         } else {
-            let current_token = self.peek().clone();
-            return Err(LoxError::new_parse(
-                current_token,
-                "Expected '(' after 'while'.",
-            ));
+            Err(LoxError::new_parse(
+                self.peek().clone(),
+                "Expect '(' after 'while'.",
+            ))
         }
     }
 
     pub fn if_statement(&mut self) -> Result<Stmt> {
         if self.match_token(&[TokenType::LPAREN]) {
-            // Left paren already consumed by match_token
+            // After the LPAREN, parse the condition next
             let cond = self.expression()?;
             // We've parsed the condition, now check for closing parenthesis
 
-            if !self.match_token(&[TokenType::RPAREN]) {
-                let current_token = self.peek().clone();
-                return Err(LoxError::new_parse(
-                    current_token,
-                    "Expected ')' after condition.",
-                ));
-            }
-            // Right paren already consumed by match_token above
+            self.consume(&TokenType::RPAREN, "Expect ')' after if condition.")?;
+            // Right paren already consumed by consume above
 
             let body = self.statement()?;
 
@@ -221,10 +191,9 @@ impl<'a> Parser<'a> {
                 else_branch: else_branch.map(|stmt| Box::new(stmt)),
             })))
         } else {
-            let current_token = self.peek().clone();
             return Err(LoxError::new_parse(
-                current_token,
-                "Expected '(' after 'if'.",
+                self.peek().clone(),
+                "Expect '(' after 'if'.",
             ));
         }
     }
@@ -237,13 +206,7 @@ impl<'a> Parser<'a> {
             stmts.push(stmt);
         }
 
-        if !self.match_token(&[TokenType::RBRACE]) {
-            let current_token = self.peek().clone();
-            return Err(LoxError::new_parse(
-                current_token,
-                "Expected '}' after block.",
-            ));
-        }
+        self.consume(&TokenType::RBRACE, "Expect '}' after block.")?;
         Ok(Stmt::Block(Box::new(Block { statements: stmts })))
     }
 
@@ -257,13 +220,7 @@ impl<'a> Parser<'a> {
     pub fn var_declar(&mut self) -> Result<Stmt> {
         // 'var' already consumed by match_token in declaration()
 
-        if !self.match_token(&[TokenType::IDENTIFIER]) {
-            let current_token = self.peek().clone();
-            return Err(LoxError::new_parse(
-                current_token,
-                "Expected variable name.",
-            ));
-        }
+        self.consume(&TokenType::IDENTIFIER, "Expect variable name.")?;
         let name = self.previous().clone();
 
         let initializer = if self.match_token(&[TokenType::EQUAL]) {
@@ -274,12 +231,10 @@ impl<'a> Parser<'a> {
             Box::new(Expr::Literal(Literal { value: Object::Nil }))
         };
 
-        if !self.match_token(&[TokenType::SEMICOLON]) {
-            return Err(LoxError::new_parse(
-                name.clone(),
-                "Expect ';' after variable declaration.",
-            ));
-        }
+        self.consume(
+            &TokenType::SEMICOLON,
+            "Expect ';' after variable declaration.",
+        )?;
 
         // Semicolon already consumed by match_token above
         Ok(Stmt::Var(Box::new(Var {
@@ -308,16 +263,9 @@ impl<'a> Parser<'a> {
     pub fn print_expression(&mut self) -> Result<Stmt> {
         let expr: Expr = self.expression()?;
 
-        if !self.match_token(&[TokenType::SEMICOLON]) {
-            let current_token = self.peek().clone();
-            return Err(LoxError::new_parse(
-                current_token,
-                "Expected ';' after value.",
-            ));
-        }
+        self.consume(&TokenType::SEMICOLON, "Expect ';' after value.")?;
 
-        // Semicolon already consumed by match_token above
-
+        // Semicolon already consumed by consume above
         Ok(Stmt::Print(Box::new(Print {
             expression: Box::new(expr),
         })))
@@ -325,15 +273,9 @@ impl<'a> Parser<'a> {
     pub fn expression_statement(&mut self) -> Result<Stmt> {
         let expr: Expr = self.expression()?;
 
-        if !self.match_token(&[TokenType::SEMICOLON]) {
-            let current_token = self.peek().clone();
-            return Err(LoxError::new_parse(
-                current_token,
-                "Expected ';' after expression.",
-            ));
-        }
-        // Semicolon already consumed by match_token above
+        self.consume(&TokenType::SEMICOLON, "Expect ';' after expression.")?;
 
+        // Semicolon already consumed by consume above
         Ok(Stmt::Expression(Box::new(Expression {
             expression: Box::new(expr),
         })))
@@ -392,13 +334,10 @@ impl<'a> Parser<'a> {
         // ternary -> comparison ( ("?") expression (":") ternary)*;
         let mut expr: Expr = self.comparison()?;
         while self.match_token(&[TokenType::QUEST]) {
-            let quest_token = self.previous().clone(); // Get '?'
             let left = self.expression()?; // parse the left expression
             // check for ':' token
-            if !self.match_token(&[TokenType::COLON]) {
-                return Err(LoxError::new_parse(quest_token, "Expected ':' after '?'"));
-            }
-            // Colon already consumed by match_token above
+            self.consume(&TokenType::COLON, "Expect ':' after '?'")?;
+            // Colon already consumed by consume above
             let right = self.ternary()?; // parse the right expression
             expr = Expr::Ternary(Box::new(Ternary {
                 condition: Box::new(expr),
@@ -476,7 +415,7 @@ impl<'a> Parser<'a> {
     }
 
     pub fn unary(&mut self) -> Result<Expr> {
-        // unary -> ( "!" | "-" ) unary | primary;
+        // unary -> ( "!" | "-" ) unary | call;
 
         if self.match_token(&[TokenType::BANG, TokenType::MINUS]) {
             let operator: Token = self.previous().clone(); // Get the operator token
@@ -490,7 +429,44 @@ impl<'a> Parser<'a> {
         }
 
         // If not a unary operator, parse as primary
-        self.primary()
+        self.call()
+    }
+
+    pub fn call(&mut self) -> Result<Expr> {
+        // call -> primary ( "(" arguments ")" )?
+        let mut callee = self.primary()?;
+
+        loop {
+            if self.match_token(&[TokenType::LPAREN]) {
+                callee = self.finish_call(callee)?;
+            } else {
+                break;
+            }
+        }
+
+        Ok(callee)
+    }
+
+    pub fn finish_call(&mut self, callee: Expr) -> Result<Expr> {
+        let mut args = Vec::new();
+
+        if !self.check(&TokenType::RPAREN) {
+            loop {
+                args.push(self.expression()?);
+                if !self.match_token(&[TokenType::COMMA]) {
+                    break;
+                }
+            }
+        }
+
+        self.consume(&TokenType::RPAREN, "Expect ')' after arguments.")?;
+
+        // Use the Call variant we defined in expr.rs
+        Ok(Expr::Call(Box::new(Call {
+            callee: Box::new(callee),
+            paren: self.previous().clone(),
+            args,
+        })))
     }
 
     pub fn primary(&mut self) -> Result<Expr> {
@@ -554,16 +530,10 @@ impl<'a> Parser<'a> {
         }
 
         if self.match_token(&[TokenType::LPAREN]) {
-            let lparen_token = self.previous().clone(); // Get '('
             let expr = self.expression()?; // Parse the inner expression
 
-            if !self.match_token(&[TokenType::RPAREN]) {
-                return Err(LoxError::new_parse(
-                    lparen_token,
-                    "Expected closing parenthesis",
-                ));
-            }
-            // Right paren already consumed by match_token above
+            self.consume(&TokenType::RPAREN, "Expected closing parenthesis")?;
+            // Right paren already consumed by consume above
 
             return Ok(Expr::Grouping(Box::new(Grouping {
                 expression: Box::new(expr),
@@ -576,8 +546,10 @@ impl<'a> Parser<'a> {
         }
 
         // If none of the above, it's an error
-        let current_token = self.peek().clone();
-        Err(LoxError::new_parse(current_token, "Expected expression"))
+        Err(LoxError::new_parse(
+            self.peek().clone(),
+            "Expect expression",
+        ))
     }
 
     pub fn parse(&mut self) -> Result<Vec<Stmt>> {
@@ -597,10 +569,7 @@ impl<'a> Parser<'a> {
     pub fn match_token(&mut self, token_types: &[TokenType]) -> bool {
         for token_type in token_types {
             if self.check(token_type) {
-                // Advance the token position safely, even if at the end
-                if !self.is_at_end() {
-                    self.current += 1;
-                }
+                self.advance();
                 return true;
             }
         }
@@ -622,15 +591,11 @@ impl<'a> Parser<'a> {
         return self.peek().token_type == *token_type;
     }
 
-    pub fn advance(&mut self) -> Result<&Token> {
-        if self.is_at_end() {
-            // Create a synthetic token for the error
-            let eof_line = self.tokens.last().map_or(0, |t| t.line);
-            let eof_token = Token::new(TokenType::EOF, "".to_string(), eof_line, None);
-            return Err(LoxError::new_parse(eof_token, "Unexpected end of input"));
+    pub fn advance(&mut self) -> &Token {
+        if !self.is_at_end() {
+            self.current += 1;
         }
-        self.current += 1;
-        Ok(&self.tokens[self.current - 1])
+        &self.tokens[self.current - 1]
     }
 
     pub fn is_at_end(&self) -> bool {
@@ -652,5 +617,14 @@ impl<'a> Parser<'a> {
             return &self.tokens[self.tokens.len() - 1];
         }
         &self.tokens[self.current]
+    }
+
+    pub fn consume(&mut self, token_type: &TokenType, message: &str) -> Result<()> {
+        if self.check(token_type) {
+            self.advance();
+            Ok(())
+        } else {
+            Err(LoxError::new_parse(self.peek().clone(), message))
+        }
     }
 }

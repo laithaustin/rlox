@@ -10,7 +10,7 @@ fn execute(source: &str) -> (Result<()>, TestErrorReporter) {
     let mut scanner = Scanner::new(source.to_string(), &mut reporter);
     scanner.scan_tokens();
     
-    let mut parser = Parser::new(&scanner.tokens, &mut reporter);
+    let mut parser = Parser::new(&scanner.tokens);
     let statements = match parser.parse() {
         Ok(stmts) => stmts,
         Err(e) => {
