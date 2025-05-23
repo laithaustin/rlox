@@ -4,20 +4,33 @@ use crate::compiler::error::{LoxError, Result};
 use crate::compiler::expr::ExprVisitor;
 use crate::compiler::expr::Object;
 use crate::compiler::expr::{Binary, Grouping, Literal, Ternary, Unary};
+use crate::compiler::natives::ClockFunction;
 use crate::compiler::stmt::Stmt;
 use crate::compiler::stmt::StmtVisitor;
 use crate::compiler::token::TokenType;
 use std::cell::RefCell;
+use std::rc::Rc;
 
 pub struct Interpreter {
     // Interpreter state will go here
+    _globals: EnvRef,
     env: RefCell<EnvRef>, // allows for us to mutate the environment by borrowing it mutably
 }
 
 impl Interpreter {
     pub fn new() -> Self {
+        let globals = Env::new_global();
+
+        // add native functions here
+        // let's add one for counting time
+        globals.borrow_mut().define(
+            "clock".to_string(),
+            Object::Function(Rc::new(ClockFunction)),
+        );
+
         Interpreter {
-            env: RefCell::new(Env::new_global()),
+            _globals: globals.clone(),
+            env: RefCell::new(globals),
         }
     }
 
@@ -107,11 +120,15 @@ impl ExprVisitor<Result<Object>> for Interpreter {
                 if args.len() != function.arity() {
                     return Err(LoxError::new_runtime(
                         call.paren.clone(),
-                        &format!("Expected {} arguments but got {}.", function.arity(), args.len()),
+                        &format!(
+                            "Expected {} arguments but got {}.",
+                            function.arity(),
+                            args.len()
+                        ),
                     ));
                 }
                 function.call(self, &args)
-            },
+            }
             _ => Err(LoxError::new_runtime(
                 call.paren.clone(),
                 "Can only call functions.",

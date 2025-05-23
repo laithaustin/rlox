@@ -16,7 +16,7 @@ impl ErrorReporter for Lox {
     fn error(&mut self, line: usize, message: &str) {
         self.report(line, "", message);
     }
-    
+
     fn runtime_error(&mut self, error: &LoxError) {
         eprintln!("{}", error);
         self.had_runtime_error = true;
@@ -25,7 +25,7 @@ impl ErrorReporter for Lox {
 
 impl Lox {
     fn new() -> Self {
-        Self { 
+        Self {
             had_error: false,
             had_runtime_error: false,
         }
