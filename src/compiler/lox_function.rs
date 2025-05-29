@@ -30,7 +30,19 @@ impl LoxCallable for LoxFunction {
 
         // execute body
         let _guard = EnvGuard::new(interpreter, env);
-        self.declaration.body.accept(interpreter)?;
+        
+        // The function body is a Block statement, so we need to extract its statements
+        match self.declaration.body.as_ref() {
+            crate::compiler::stmt::Stmt::Block(block) => {
+                for stmt in &block.statements {
+                    stmt.accept(interpreter)?;
+                }
+            }
+            _ => {
+                // If it's not a block, just execute the single statement
+                self.declaration.body.accept(interpreter)?;
+            }
+        }
 
         Ok(Object::Nil)
     }

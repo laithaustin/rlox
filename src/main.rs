@@ -38,9 +38,10 @@ impl Lox {
         // dummy tokens for testing (need to use type annotations)
         // let tokens = vec!["(", ")", "{", "}", ",", ".", "-", "+", ";", "*", "!"];
 
-        for token in &scanner.tokens {
-            println!("{:?}", token);
-        }
+        // Debug: print tokens (disabled for now)
+        // for token in &scanner.tokens {
+        //     println!("{:?}", token);
+        // }
 
         // second phase: parse the tokens
         let mut parser = Parser::new(&scanner.tokens);

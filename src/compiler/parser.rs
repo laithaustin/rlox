@@ -76,6 +76,7 @@ impl Parser {
             .consume(&TokenType::IDENTIFIER, "Expect function name.")?
             .clone();
         let params = self.fun_parameters()?;
+        self.consume(&TokenType::LBRACE, "Expect '{' before function body.")?;
         let body = self.block()?;
         Ok(Stmt::Function(Box::new(Function {
             name: Box::new(name),
@@ -257,6 +258,9 @@ impl Parser {
     }
 
     pub fn declaration(&mut self) -> Result<Stmt> {
+        if self.match_token(&[TokenType::FUN]) {
+            return self.function();
+        }
         if self.match_token(&[TokenType::VAR]) {
             return self.var_declar();
         }
