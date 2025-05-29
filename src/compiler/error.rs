@@ -1,5 +1,5 @@
-use std::fmt;
 use crate::compiler::token::{Token, TokenType};
+use std::fmt;
 
 // Define different error types in our interpreter
 #[derive(Debug, Clone)]

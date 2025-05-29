@@ -34,6 +34,10 @@ impl TestErrorReporter {
     pub fn assert_no_runtime_errors(&self) {
         assert!(self.runtime_errors.is_empty(), "Expected no runtime errors, but got: {:?}", self.runtime_errors);
     }
+    
+    pub fn has_errors(&self) -> bool {
+        !self.errors.is_empty() || !self.runtime_errors.is_empty()
+    }
 }
 
 impl ErrorReporter for TestErrorReporter {

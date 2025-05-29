@@ -5,7 +5,7 @@ use std::{
 
 mod compiler;
 
-use compiler::{ErrorReporter, Interpreter, LoxError, LoxErrorKind, Parser, Scanner};
+use compiler::{ErrorReporter, Interpreter, LoxError, Parser, Scanner};
 
 pub struct Lox {
     had_error: bool,
