@@ -1,7 +1,7 @@
 use crate::compiler::expr::{
     Assign, Binary, Call, Expr, Grouping, Literal, Logical, Object, Ternary, Unary, Variable,
 };
-use crate::compiler::stmt::{Block, Expression, IfStmt, Print, Stmt, Var, WhileStmt};
+use crate::compiler::stmt::{Block, Expression, Function, IfStmt, Print, Stmt, Var, WhileStmt};
 use crate::compiler::token::TokenType;
 use crate::compiler::{LoxError, Result, Token};
 
@@ -9,7 +9,10 @@ use crate::compiler::{LoxError, Result, Token};
 // program -> declaration* EOF
 // declaration -> varStmt | statement
 // varStmt -> "var" identifier ("=" expression)? ";"
-// statement -> printStmt | exprStmt | whileStmt | forStmt | ifStmt | block ";"
+// statement -> printStmt | exprStmt | whileStmt | forStmt | ifStmt | block | funcStmt ";"
+// funcStmt -> "func" function;
+// function -> Identifier "(" parameters? ")" block;
+// parameters -> Identifier ("," Identifier)*
 // forStmt -> "for" "(" (exprStmt | varStmt | ";") expression? ";" expression? ")" statement ";"
 // whileStmt -> "while" "(" expression ")" statement ";"
 // ifStmt -> if "(" expression ")" statement ( else statement )? ";"
@@ -62,6 +65,49 @@ impl Parser {
         }
 
         Ok(lval)
+    }
+
+    pub fn fun_statement(&mut self) -> Result<Stmt> {
+        self.function()
+    }
+
+    pub fn function(&mut self) -> Result<Stmt> {
+        let name = self
+            .consume(&TokenType::IDENTIFIER, "Expect function name.")?
+            .clone();
+        let params = self.fun_parameters()?;
+        let body = self.block()?;
+        Ok(Stmt::Function(Box::new(Function {
+            name: Box::new(name),
+            parameters: Box::new(params),
+            body: Box::new(body),
+        })))
+    }
+
+    pub fn fun_parameters(&mut self) -> Result<Vec<Token>> {
+        let mut params = Vec::new();
+        self.consume(&TokenType::LPAREN, "Expect '(' after function name.")?;
+
+        if !self.check(&TokenType::RPAREN) {
+            loop {
+                if params.len() >= 255 {
+                    return Err(LoxError::new_parse(
+                        self.peek().clone(),
+                        "Cannot have more than 255 parameters.",
+                    ));
+                }
+                params.push(
+                    self.consume(&TokenType::IDENTIFIER, "Expect parameter name.")?
+                        .clone(),
+                );
+                if !self.match_token(&[TokenType::COMMA]) {
+                    break;
+                }
+            }
+        }
+        self.consume(&TokenType::RPAREN, "Expect ')' after parameters.")?;
+
+        Ok(params)
     }
 
     pub fn for_statement(&mut self) -> Result<Stmt> {
@@ -251,6 +297,8 @@ impl Parser {
             return self.block();
         } else if self.match_token(&[TokenType::WHILE]) {
             return self.while_statement();
+        } else if self.match_token(&[TokenType::FUN]) {
+            return self.fun_statement();
         } else if self.match_token(&[TokenType::FOR]) {
             return self.for_statement();
         } else if self.match_token(&[TokenType::IF]) {
@@ -619,10 +667,9 @@ impl Parser {
         &self.tokens[self.current]
     }
 
-    pub fn consume(&mut self, token_type: &TokenType, message: &str) -> Result<()> {
+    pub fn consume(&mut self, token_type: &TokenType, message: &str) -> Result<&Token> {
         if self.check(token_type) {
-            self.advance();
-            Ok(())
+            Ok(self.advance())
         } else {
             Err(LoxError::new_parse(self.peek().clone(), message))
         }

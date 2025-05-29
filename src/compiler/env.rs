@@ -1,3 +1,4 @@
+use crate::compiler::Interpreter;
 use crate::compiler::error::{LoxError, Result};
 use crate::compiler::expr::Object;
 use crate::compiler::token::Token;
@@ -7,9 +8,32 @@ use std::rc::Rc;
 
 pub type EnvRef = Rc<RefCell<Env>>;
 
+#[derive(Debug, Clone)]
 pub struct Env {
     enclosing: Option<EnvRef>,
     bindings: HashMap<String, Object>,
+}
+
+pub struct EnvGuard<'a> {
+    interpreter: &'a Interpreter,
+    previous: EnvRef,
+}
+
+impl<'a> EnvGuard<'a> {
+    pub fn new(interpreter: &'a Interpreter, new_env: EnvRef) -> Self {
+        // save old and replace with new given env
+        let previous = interpreter.env.replace(new_env);
+        EnvGuard {
+            interpreter,
+            previous,
+        }
+    }
+}
+
+impl<'a> Drop for EnvGuard<'a> {
+    fn drop(&mut self) {
+        self.interpreter.env.replace(self.previous.clone());
+    }
 }
 
 impl Env {
@@ -44,12 +68,12 @@ impl Env {
             self.bindings.insert(name.lexeme.clone(), value);
             return Ok(&self.bindings[&name.lexeme]);
         }
-        
+
         // If not in current environment, check in enclosing environments
         match &self.enclosing {
             Some(enclosed) => {
                 enclosed.borrow_mut().assign(name, value)?;
-                // Return a reference to the value in this environment 
+                // Return a reference to the value in this environment
                 // (this is slightly inconsistent since the value is actually in the parent)
                 Ok(&self.bindings.get(&name.lexeme).unwrap_or(&Object::Nil))
             }

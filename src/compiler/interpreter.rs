@@ -1,9 +1,9 @@
-use crate::compiler::env::Env;
-use crate::compiler::env::EnvRef;
+use crate::compiler::env::{Env, EnvGuard, EnvRef};
 use crate::compiler::error::{LoxError, Result};
 use crate::compiler::expr::ExprVisitor;
 use crate::compiler::expr::Object;
-use crate::compiler::expr::{Binary, Grouping, Literal, Ternary, Unary};
+use crate::compiler::expr::{Binary, Grouping, Literal, LoxCallable, Ternary, Unary};
+use crate::compiler::lox_function::LoxFunction;
 use crate::compiler::natives::ClockFunction;
 use crate::compiler::stmt::Stmt;
 use crate::compiler::stmt::StmtVisitor;
@@ -13,8 +13,8 @@ use std::rc::Rc;
 
 pub struct Interpreter {
     // Interpreter state will go here
-    _globals: EnvRef,
-    env: RefCell<EnvRef>, // allows for us to mutate the environment by borrowing it mutably
+    pub _globals: EnvRef,
+    pub env: RefCell<EnvRef>, // allows for us to mutate the environment by borrowing it mutably
 }
 
 impl Interpreter {
@@ -52,9 +52,35 @@ impl Interpreter {
             _ => true,
         }
     }
+
+    pub fn execute_block(&self, statements: &Vec<Stmt>, new_env: EnvRef) -> Result<()> {
+        let _guard = EnvGuard::new(self, new_env);
+        for statement in statements.iter() {
+            statement.accept(self)?;
+        }
+        Ok(())
+    }
 }
 
 impl StmtVisitor<Result<Object>> for Interpreter {
+    fn visit_function(&self, function: &super::stmt::Function) -> Result<Object> {
+        // first create function object using current env and ast node
+        let lox_function = LoxFunction {
+            declaration: function.clone(),
+            closure: self.env.borrow().clone(),
+        };
+        // make sure to create a new shared reference to the function object
+        let function_obj = Object::Function(Rc::new(lox_function));
+
+        // inject into the environment
+        self.env
+            .borrow()
+            .borrow_mut()
+            .define(function.name.lexeme.clone(), function_obj);
+
+        Ok(Object::Nil)
+    }
+
     fn visit_while_stmt(&self, while_stmt: &super::stmt::WhileStmt) -> Result<Object> {
         while Interpreter::is_truthy(while_stmt.condition.accept(self)?) {
             while_stmt.body.accept(self)?;
@@ -74,15 +100,8 @@ impl StmtVisitor<Result<Object>> for Interpreter {
 
     fn visit_block(&self, block: &super::stmt::Block) -> Result<Object> {
         // update env
-        let prev = self.env.borrow().clone(); // save current env
-        let new_env = Env::new_enclosed(prev.clone());
-        self.env.replace(new_env);
-
-        for statement in &block.statements {
-            statement.accept(self)?;
-        }
-
-        self.env.replace(prev);
+        let new_env = Env::new_enclosed(self.env.borrow().clone());
+        self.execute_block(&block.statements, new_env)?;
         Ok(Object::Nil)
     }
 

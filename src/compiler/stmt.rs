@@ -10,6 +10,7 @@ pub enum Stmt {
     Block(Box<Block>),
     IfStmt(Box<IfStmt>),
     WhileStmt(Box<WhileStmt>),
+    Function(Box<Function>),
 }
 
 pub trait StmtVisitor<T> {
@@ -19,6 +20,7 @@ pub trait StmtVisitor<T> {
     fn visit_block(&self, block: &Block) -> T;
     fn visit_if_stmt(&self, if_stmt: &IfStmt) -> T;
     fn visit_while_stmt(&self, while_stmt: &WhileStmt) -> T;
+    fn visit_function(&self, function: &Function) -> T;
 }
 
 impl Stmt {
@@ -30,6 +32,7 @@ impl Stmt {
             Stmt::Block(b) => visitor.visit_block(b),
             Stmt::IfStmt(b) => visitor.visit_if_stmt(b),
             Stmt::WhileStmt(b) => visitor.visit_while_stmt(b),
+            Stmt::Function(b) => visitor.visit_function(b),
         }
     }
 }
@@ -65,5 +68,12 @@ pub struct IfStmt {
 #[derive(Debug, Clone)]
 pub struct WhileStmt {
     pub condition: Box<Expr>,
+    pub body: Box<Stmt>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Function {
+    pub name: Box<Token>,
+    pub parameters: Box<Vec<Token>>,
     pub body: Box<Stmt>,
 }
