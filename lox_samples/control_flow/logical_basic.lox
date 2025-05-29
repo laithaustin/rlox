@@ -1,0 +1,19 @@
+var a = 3;
+var b = 4;
+var c = 6;
+
+if ((a < b) and (b < c)){
+  print "a is the smallest number";
+}
+
+if ((a > b) and (b < c)){
+  print "this should be ignored.";
+}
+
+if ((a > b) or (b < c)){
+  print "b is less than c!";
+}
+
+if ((a < b) or (b < c)){
+  print "a is less than b!";
+}

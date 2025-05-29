@@ -1,0 +1,56 @@
+// Basic function declaration and call
+fun sayHello() {
+    print "Hello, World!";
+}
+sayHello();
+
+// Function with parameters
+fun greet(name) {
+    print "Hello, " + name + "!";
+}
+greet("Alice");
+
+// Function with multiple parameters
+fun add(a, b) {
+    print "Sum: " + (a + b);
+}
+add(5, 3);
+
+// Function with local variables
+fun calculate(x, y) {
+    var sum = x + y;
+    var product = x * y;
+    print "Sum: " + sum;
+    print "Product: " + product;
+}
+calculate(4, 6);
+
+// Function with conditionals
+fun max(a, b) {
+    if (a > b) {
+        print "Max is: " + a;
+    } else {
+        print "Max is: " + b;
+    }
+}
+max(10, 5);
+
+// Function accessing global variables
+var globalVar = "I am global";
+fun testGlobal() {
+    print globalVar;
+}
+testGlobal();
+
+// Function with loops
+fun countdown(n) {
+    while (n > 0) {
+        print n;
+        n = n - 1;
+    }
+    print "Blast off!";
+}
+countdown(3);
+
+// Test native function
+print "Current timestamp: " + clock();

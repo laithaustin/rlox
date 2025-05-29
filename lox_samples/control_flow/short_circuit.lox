@@ -1,0 +1,1 @@
+var a = true; var b = nil; var result1 = a or false; var result2 = b and true; print result1; print result2;

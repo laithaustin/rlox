@@ -1,0 +1,1 @@
+var a = true; var b = false; var c = true; if (a and c or b) { print "Expression is true"; } else { print "Expression is false"; }

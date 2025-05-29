@@ -1,0 +1,43 @@
+// Test function arity errors
+
+fun needsTwoArgs(a, b) {
+    print a + b;
+}
+
+// This should error - too few arguments
+// needsTwoArgs(1);
+
+// This should error - too many arguments  
+// needsTwoArgs(1, 2, 3);
+
+// Test calling non-function
+var notAFunction = "hello";
+// notAFunction();
+
+// Test undefined function
+// undefinedFunction();
+
+// Test function with no parameters called with arguments
+fun noParams() {
+    print "No parameters needed";
+}
+// noParams(1, 2);
+
+// Test parameter shadowing works correctly
+var x = "global";
+fun shadowTest(x) {
+    print "Parameter x: " + x;
+    var x = "local";
+    print "Local x: " + x;
+}
+shadowTest("param");
+print "Global x: " + x;
+
+// Test local variable scope
+fun scopeTest() {
+    var local = "inside function";
+    print local;
+}
+scopeTest();
+// This should error if uncommented - local variable not accessible
+// print local;

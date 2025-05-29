@@ -1,0 +1,11 @@
+// Test function arity errors
+
+fun needsTwoArgs(a, b) {
+    print "a: " + a + ", b: " + b;
+}
+
+// This should work fine
+needsTwoArgs(1, 2);
+
+// This should error - too few arguments
+needsTwoArgs(1);
