@@ -1,7 +1,9 @@
 use crate::compiler::expr::{
     Assign, Binary, Call, Expr, Grouping, Literal, Logical, Object, Ternary, Unary, Variable,
 };
-use crate::compiler::stmt::{Block, Expression, Function, IfStmt, Print, Stmt, Var, WhileStmt};
+use crate::compiler::stmt::{
+    Block, Expression, Function, IfStmt, Print, ReturnStmt, Stmt, Var, WhileStmt,
+};
 use crate::compiler::token::TokenType;
 use crate::compiler::{LoxError, Result, Token};
 
@@ -9,8 +11,9 @@ use crate::compiler::{LoxError, Result, Token};
 // program -> declaration* EOF
 // declaration -> varStmt | statement
 // varStmt -> "var" identifier ("=" expression)? ";"
-// statement -> printStmt | exprStmt | whileStmt | forStmt | ifStmt | block | funcStmt ";"
+// statement -> printStmt | exprStmt | whileStmt | forStmt | ifStmt | block | funcStmt | returnStmt ";"
 // funcStmt -> "func" function;
+// returnStmt -> "return" expression? ";"
 // function -> Identifier "(" parameters? ")" block;
 // parameters -> Identifier ("," Identifier)*
 // forStmt -> "for" "(" (exprStmt | varStmt | ";") expression? ";" expression? ")" statement ";"
@@ -195,6 +198,15 @@ impl Parser {
         }
     }
 
+    pub fn return_statement(&mut self) -> Result<Stmt> {
+        let expr = self.expression()?;
+        self.consume(&TokenType::SEMICOLON, "Expect ';' after return value.")?;
+        Ok(Stmt::ReturnStmt(Box::new(ReturnStmt {
+            tok: Box::new(self.previous().clone()),
+            value: Box::new(expr),
+        })))
+    }
+
     pub fn while_statement(&mut self) -> Result<Stmt> {
         if self.match_token(&[TokenType::LPAREN]) {
             let cond = self.expression()?;
@@ -305,6 +317,8 @@ impl Parser {
             return self.fun_statement();
         } else if self.match_token(&[TokenType::FOR]) {
             return self.for_statement();
+        } else if self.match_token(&[TokenType::RETURN]) {
+            return self.return_statement();
         } else if self.match_token(&[TokenType::IF]) {
             return self.if_statement();
         } else {

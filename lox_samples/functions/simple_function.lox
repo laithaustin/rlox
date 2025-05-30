@@ -1,5 +1,7 @@
 fun sayHello() {
     print "Hello, World!";
+    return 0;
 }
 
-sayHello();
+var x = sayHello();
+print x;

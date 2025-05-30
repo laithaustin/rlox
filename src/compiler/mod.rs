@@ -1,4 +1,5 @@
 pub mod astPrinter;
+pub mod control_flow;
 pub mod env;
 pub mod error;
 pub mod expr;
@@ -11,6 +12,7 @@ pub mod stmt;
 pub mod token;
 
 pub use astPrinter::*;
+pub use control_flow::*;
 pub use env::Env;
 pub use error::{ErrorReporter, LoxError, LoxErrorKind, Result};
 pub use expr::Expr;
