@@ -1,0 +1,10 @@
+fun countdown(n) {
+    if (n <= 0) {
+        print "Done!";
+        return nil;
+    }
+    print n;
+    countdown(n - 1);
+}
+
+countdown(3);
