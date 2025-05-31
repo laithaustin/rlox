@@ -63,12 +63,15 @@ impl Interpreter {
         }
     }
 
-    pub fn execute_block(&self, statements: &Vec<Stmt>, new_env: EnvRef) -> Result<()> {
+    pub fn execute_block(&self, statements: &Vec<Stmt>, new_env: EnvRef) -> FlowResult<Object> {
         let _guard = EnvGuard::new(self, new_env);
         for statement in statements.iter() {
-            statement.accept(self)?;
+            let (_, flow) = statement.accept(self)?;
+            if let ControlFlow::Return(value) = flow {
+                return return_value(value);
+            }
         }
-        Ok(())
+        ok(Object::Nil)
     }
 }
 
@@ -79,7 +82,14 @@ impl StmtVisitor<FlowResult<Object>> for Interpreter {
     }
 
     fn visit_function(&self, function: &super::stmt::Function) -> FlowResult<Object> {
-        // first create function object using current env and ast node
+        // First, define the function in the current environment with a placeholder
+        // This allows recursive functions to find themselves in their closure
+        self.env
+            .borrow()
+            .borrow_mut()
+            .define(function.name.lexeme.clone(), Object::Nil);
+
+        // Now create function object using current env as closure (which includes the function)
         let lox_function = LoxFunction {
             declaration: function.clone(),
             closure: self.env.borrow().clone(),
@@ -87,7 +97,7 @@ impl StmtVisitor<FlowResult<Object>> for Interpreter {
         // make sure to create a new shared reference to the function object
         let function_obj = Object::Function(Rc::new(lox_function));
 
-        // inject into the environment
+        // Replace the placeholder with the actual function object
         self.env
             .borrow()
             .borrow_mut()
@@ -98,7 +108,10 @@ impl StmtVisitor<FlowResult<Object>> for Interpreter {
 
     fn visit_while_stmt(&self, while_stmt: &super::stmt::WhileStmt) -> FlowResult<Object> {
         while Interpreter::is_truthy(while_stmt.condition.accept(self)?.0) {
-            while_stmt.body.accept(self)?;
+            let (_, flow) = while_stmt.body.accept(self)?;
+            if let ControlFlow::Return(value) = flow {
+                return return_value(value);
+            }
         }
         ok(Object::Nil)
     }
@@ -106,9 +119,15 @@ impl StmtVisitor<FlowResult<Object>> for Interpreter {
     fn visit_if_stmt(&self, if_stmt: &super::stmt::IfStmt) -> FlowResult<Object> {
         let cond = if_stmt.condition.accept(self)?;
         if Interpreter::is_truthy(cond.0) {
-            if_stmt.then_branch.accept(self)?;
+            let result = if_stmt.then_branch.accept(self)?;
+            if let ControlFlow::Return(value) = result.1 {
+                return return_value(value);
+            }
         } else if let Some(else_branch) = &if_stmt.else_branch {
-            else_branch.accept(self)?;
+            let result = else_branch.accept(self)?;
+            if let ControlFlow::Return(value) = result.1 {
+                return return_value(value);
+            }
         }
         ok(Object::Nil)
     }
@@ -116,8 +135,7 @@ impl StmtVisitor<FlowResult<Object>> for Interpreter {
     fn visit_block(&self, block: &super::stmt::Block) -> FlowResult<Object> {
         // update env
         let new_env = Env::new_enclosed(self.env.borrow().clone());
-        self.execute_block(&block.statements, new_env)?;
-        ok(Object::Nil)
+        self.execute_block(&block.statements, new_env)
     }
 
     fn visit_var(&self, var: &super::stmt::Var) -> FlowResult<Object> {
