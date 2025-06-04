@@ -70,4 +70,18 @@ fn test_keywords_as_identifiers() {
     assert_eq!(tokens[1].token_type, TokenType::IDENTIFIER, "Expected IDENTIFIER for 'classy', got {:?}", tokens[1].token_type);
     assert_eq!(tokens[2].token_type, TokenType::IDENTIFIER, "Expected IDENTIFIER for 'notelse', got {:?}", tokens[2].token_type);
     reporter.assert_no_errors();
-} 
+}
+
+#[test]
+fn test_keyword_case_sensitivity() {
+    let (tokens, reporter) = scan("AND or TRUE false");
+    assert_token_sequence(&tokens, &[
+        TokenType::IDENTIFIER,
+        TokenType::OR,
+        TokenType::IDENTIFIER,
+        TokenType::FALSE,
+    ]);
+    assert_eq!(tokens[0].lexeme, "AND");
+    assert_eq!(tokens[2].lexeme, "TRUE");
+    reporter.assert_no_errors();
+}

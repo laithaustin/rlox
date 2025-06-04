@@ -159,8 +159,7 @@ impl<'a> Scanner<'a> {
         }
 
         let text = self.source[self.start..self.current].to_string();
-        let lowercase_text = text.to_lowercase();
-        let token: TokenType = lowercase_text.parse().unwrap_or(TokenType::IDENTIFIER);
+        let token: TokenType = text.parse().unwrap_or(TokenType::IDENTIFIER);
         self.add_token(token);
     }
 
