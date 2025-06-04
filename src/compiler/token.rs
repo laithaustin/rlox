@@ -1,7 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-// Estalish basic token types for the lexer
+// Establish basic token types for the lexer
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenType {
     // single char tokens
