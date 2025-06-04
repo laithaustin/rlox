@@ -11,14 +11,14 @@ use crate::compiler::{LoxError, Result, Token};
 // program -> declaration* EOF
 // declaration -> varStmt | statement
 // varStmt -> "var" identifier ("=" expression)? ";"
-// statement -> printStmt | exprStmt | whileStmt | forStmt | ifStmt | block | funcStmt | returnStmt ";"
+// statement -> printStmt | exprStmt | whileStmt | forStmt | ifStmt | block | funcStmt | returnStmt
 // funcStmt -> "func" function;
 // returnStmt -> "return" expression? ";"
 // function -> Identifier "(" parameters? ")" block;
 // parameters -> Identifier ("," Identifier)*
-// forStmt -> "for" "(" (exprStmt | varStmt | ";") expression? ";" expression? ")" statement ";"
-// whileStmt -> "while" "(" expression ")" statement ";"
-// ifStmt -> if "(" expression ")" statement ( else statement )? ";"
+// forStmt -> "for" "(" (exprStmt | varStmt | ";") expression? ";" expression? ")" statement
+// whileStmt -> "while" "(" expression ")" statement
+// ifStmt -> if "(" expression ")" statement ( else statement )?
 // block -> "{" declaration* "}" ;
 // printStmt -> "print" expression ";"
 // exprStmt -> expression ";"
