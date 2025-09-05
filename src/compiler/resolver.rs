@@ -7,12 +7,13 @@ use crate::compiler::stmt::StmtVisitor;
 use crate::compiler::token::{Token, TokenType};
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use super::expr::Variable;
 use super::stmt::Function;
 
 pub struct Resolver {
-    pub interpreter: Interpreter,
+    pub interpreter: Rc<RefCell<Interpreter>>,
     pub scopes: RefCell<Vec<HashMap<String, bool>>>,
     pub errors: RefCell<Vec<LoxError>>,
 }
@@ -160,6 +161,7 @@ impl Resolver {
         for (i, scope) in self.scopes.borrow().iter().enumerate().rev() {
             if scope.contains_key(&name.lexeme) {
                 self.interpreter
+                    .borrow()
                     .resolve(name, self.scopes.borrow().len() - i - 1);
                 return;
             }
@@ -214,7 +216,7 @@ impl Resolver {
             .push(LoxError::new_parse(token.clone(), err_msg));
     }
 
-    pub fn new(interpreter: Interpreter) -> Self {
+    pub fn new(interpreter: Rc<RefCell<Interpreter>>) -> Self {
         Self {
             interpreter,
             scopes: RefCell::new(Vec::new()),

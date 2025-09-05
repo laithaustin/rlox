@@ -63,6 +63,14 @@ impl Env {
         self.enclosing = enclosing;
     }
 
+    pub fn assign_at(&mut self, distance: usize, name: &Token, value: Object) -> Result<&Object> {
+        self.ancestor(distance)?
+            .borrow_mut()
+            .bindings
+            .insert(name.lexeme.clone(), value);
+        Ok(&self.bindings[&name.lexeme])
+    }
+
     pub fn assign(&mut self, name: &Token, value: Object) -> Result<&Object> {
         // Check if the variable exists in the current environment
         if self.bindings.contains_key(&name.lexeme) {

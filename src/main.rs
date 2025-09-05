@@ -1,11 +1,13 @@
 use std::{
+    cell::RefCell,
     env, fs,
     io::{self, BufRead, Write},
+    rc::Rc,
 };
 
 mod compiler;
 
-use compiler::{ErrorReporter, Interpreter, LoxError, Parser, Scanner};
+use compiler::{ErrorReporter, Interpreter, LoxError, Parser, Resolver, Scanner};
 
 pub struct Lox {
     had_error: bool,
@@ -47,8 +49,9 @@ impl Lox {
         let mut parser = Parser::new(&scanner.tokens);
         match parser.parse() {
             Ok(ast) => {
-                let mut interpreter = Interpreter::new();
-                match interpreter.interpret(ast) {
+                let interpreter = Rc::new(RefCell::new(Interpreter::new()));
+                let mut resolver = Resolver::new(interpreter.clone());
+                match interpreter.borrow_mut().interpret(ast) {
                     Ok(_) => (),
                     Err(e) => {
                         eprintln!("Runtime error: {}", e);

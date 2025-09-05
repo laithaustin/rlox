@@ -20,6 +20,7 @@ pub use expr::Expr;
 pub use interpreter::Interpreter;
 pub use natives::ClockFunction;
 pub use parser::Parser;
+pub use resolver::Resolver;
 pub use scanner::Scanner;
 pub use stmt::Stmt;
 pub use token::Token;

@@ -229,6 +229,21 @@ impl ExprVisitor<FlowResult<Object>> for Interpreter {
 
     fn visit_assign(&self, assign: &super::expr::Assign) -> FlowResult<Object> {
         let value = assign.value.accept(self)?;
+
+        let distance = self.locals.borrow();
+        let distance = distance.get(&assign.name);
+        if let Some(distance) = distance {
+            self.env
+                .borrow()
+                .borrow_mut()
+                .assign_at(*distance, &assign.name, value.0.clone())?;
+        } else {
+            self.env
+                .borrow()
+                .borrow_mut()
+                .assign(&assign.name, value.0.clone())?;
+        }
+
         let cloned_value = value.0.clone();
         self.env
             .borrow()
