@@ -14,6 +14,7 @@ use super::stmt::Function;
 pub struct Resolver {
     pub interpreter: Interpreter,
     pub scopes: RefCell<Vec<HashMap<String, bool>>>,
+    pub errors: RefCell<Vec<LoxError>>,
 }
 
 // Our primary concerns for this semantic analysis are for the following cases:
@@ -70,16 +71,25 @@ impl StmtVisitor<()> for Resolver {
 impl ExprVisitor<()> for Resolver {
     fn visit_variable(&self, variable: &Variable) -> () {
         if !self.scopes.borrow().is_empty() {
-            if let Some(false) = self.scopes.borrow().last().unwrap().get(&variable.name.lexeme) {
-                eprintln!("Can't read local variable in its own initializer.");
+            if let Some(false) = self
+                .scopes
+                .borrow()
+                .last()
+                .unwrap()
+                .get(&variable.name.lexeme)
+            {
+                self.error(
+                    &variable.name,
+                    "Can't read local variable in its own initializer.",
+                );
             }
         }
-        self.resolve_local(&Expr::Variable(variable.clone()), &variable.name);
+        self.resolve_local(&Expr::Variable(Box::new(variable.clone())), &variable.name);
     }
-            
+
     fn visit_call(&self, call: &super::expr::Call) -> () {
         self.resolve_expression(&call.callee);
-        for arg in &call.arguments {
+        for arg in &call.args {
             self.resolve_expression(arg);
         }
     }
@@ -91,7 +101,10 @@ impl ExprVisitor<()> for Resolver {
 
     fn visit_assign(&self, assign: &super::expr::Assign) -> () {
         self.resolve_expression(&assign.value);
-        self.resolve_local(&assign.value, &assign.name);
+
+        // we need to actually create a variable expression
+        let var_expr = Expr::Variable(Box::new(assign.name.clone()));
+        self.resolve_local(&var_expr, &assign.name);
     }
 
     fn visit_logical(&self, logical: &super::expr::Logical) -> () {
@@ -157,10 +170,15 @@ impl Resolver {
     }
 
     pub fn declare(&self, var: &Token) {
-        if self.scopes.borrow().is_empty() {
-            return;
+        {
+            let scopes = self.scopes.borrow();
+            if scopes.is_empty() {
+                return;
+            }
         }
-        let current = self.scopes.borrow_mut().last_mut().unwrap();
+
+        let mut scopes = self.scopes.borrow_mut();
+        let current = scopes.last_mut().unwrap();
         if current.contains_key(&var.lexeme) {
             eprintln!("Variable '{}' already declared in this scope.", var.lexeme);
         }
@@ -194,7 +212,9 @@ impl Resolver {
     }
 
     pub fn error(&self, token: &Token, err_msg: &str) {
-        self.errors.borrow_mut().push(LoxError::new(token.clone(), err_msg.to_string());
+        self.errors
+            .borrow_mut()
+            .push(LoxError::new_parse(token.clone(), err_msg));
     }
 
     pub fn new(interpreter: Interpreter) -> Self {

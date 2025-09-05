@@ -1,3 +1,4 @@
+use crate::Expr;
 use crate::compiler::control_flow::{ControlFlow, FlowResult, extract_value, ok, return_value};
 use crate::compiler::env::{Env, EnvGuard, EnvRef};
 use crate::compiler::error::{LoxError, Result};
@@ -10,12 +11,14 @@ use crate::compiler::stmt::Stmt;
 use crate::compiler::stmt::StmtVisitor;
 use crate::compiler::token::{Token, TokenType};
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct Interpreter {
     // Interpreter state will go here
     pub _globals: EnvRef,
     pub env: RefCell<EnvRef>, // allows for us to mutate the environment by borrowing it mutably
+    pub locals: RefCell<HashMap<*const Expr, usize>>,
 }
 
 impl Interpreter {
@@ -32,7 +35,12 @@ impl Interpreter {
         Interpreter {
             _globals: globals.clone(),
             env: RefCell::new(globals),
+            locals: RefCell::new(HashMap::new()),
         }
+    }
+
+    pub fn resolve(&mut self, expr: &Expr, depth: usize) {
+        self.locals.borrow_mut().insert(expr as *const Expr, depth);
     }
 
     fn execute(&mut self, statement: &Stmt) -> FlowResult<Object> {

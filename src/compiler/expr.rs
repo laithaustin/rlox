@@ -1,8 +1,8 @@
-use std::rc::Rc;
-use std::fmt;
 use crate::compiler::Result;
 use crate::compiler::interpreter::Interpreter;
 use crate::compiler::token::Token;
+use std::fmt;
+use std::rc::Rc;
 
 // Define Object type to represent Lox values
 #[derive(Debug, Clone)]
