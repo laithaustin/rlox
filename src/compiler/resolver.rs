@@ -39,15 +39,40 @@ impl StmtVisitor<()> for Resolver {
     }
 
     fn visit_var(&self, var: &super::stmt::Var) -> () {
+        // For self-reference detection, we need to declare the variable
+        // before resolving its initializer, even in global scope
+        let was_global = self.scopes.borrow().is_empty();
+
+        if was_global {
+            // Create temporary scope for global variable self-reference detection
+            self.begin_scope();
+        }
+
         self.declare(&var.name);
         self.resolve_expression(&var.initializer);
         self.define(&var.name);
+
+        if was_global {
+            // Remove temporary scope
+            self.end_scope();
+        }
     }
 
     fn visit_function(&self, function: &super::stmt::Function) -> () {
-        self.declare(&function.name);
-        self.define(&function.name);
-        self.resolve_function(&function, FunctionType::FUNCTION);
+        // Handle function declaration similar to variables but allow immediate use
+        let was_global = self.scopes.borrow().is_empty();
+
+        if was_global {
+            // For global functions, we don't need scope management
+            // They should be available in global environment
+        } else {
+            // For local functions, declare and define immediately
+            // (functions are hoisted and can be called before definition)
+            self.declare(&function.name);
+            self.define(&function.name);
+        }
+
+        self.resolve_function(function);
     }
 
     fn visit_expression(&self, expression: &super::stmt::Expression) -> () {
@@ -149,10 +174,10 @@ impl Resolver {
         self.scopes.borrow_mut().pop();
     }
 
-    pub fn resolve_function(&self, func: &Function, ftype: FunctionType) {
+    pub fn resolve_function(&self, func: &Function) {
         // stash our function status - need to traxk when we enter and exit
         let enclosing_function: FunctionType = self.current_function.borrow().clone();
-        self.current_function.replace(ftype);
+        self.current_function.replace(FunctionType::FUNCTION);
 
         self.begin_scope();
         for param in func.parameters.iter() {

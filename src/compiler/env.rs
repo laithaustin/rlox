@@ -108,6 +108,14 @@ impl Env {
     }
 
     pub fn get_at(&self, distance: usize, name: &str) -> Result<Object> {
+        if distance == 0 {
+            return Ok(self
+                .bindings
+                .get(name)
+                .ok_or_else(|| LoxError::new_internal(&format!("undefined var: {}", name)))?
+                .clone());
+        }
+
         return Ok(self
             .ancestor(distance)?
             .borrow()
