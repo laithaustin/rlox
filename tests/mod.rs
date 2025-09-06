@@ -1,11 +1,11 @@
-mod scanner;
 mod common;
-mod parser;
 mod functions;
-mod interpreter;
+mod parser;
+mod resolver;
+mod scanner;
 
-pub use scanner::*;
 pub use common::*;
-pub use parser::*;
 pub use functions::*;
-pub use interpreter::*;
+pub use parser::*;
+pub use resolver::*;
+pub use scanner::*;
