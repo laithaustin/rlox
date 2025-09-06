@@ -63,12 +63,17 @@ impl Env {
         self.enclosing = enclosing;
     }
 
-    pub fn assign_at(&mut self, distance: usize, name: &Token, value: Object) -> Result<&Object> {
+    pub fn assign_at(&mut self, distance: usize, name: &Token, value: Object) -> Result<()> {
+        if distance == 0 {
+            self.bindings.insert(name.lexeme.clone(), value);
+            return Ok(());
+        }
+
         self.ancestor(distance)?
             .borrow_mut()
             .bindings
             .insert(name.lexeme.clone(), value);
-        Ok(&self.bindings[&name.lexeme])
+        Ok(())
     }
 
     pub fn assign(&mut self, name: &Token, value: Object) -> Result<&Object> {

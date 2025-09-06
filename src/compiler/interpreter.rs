@@ -38,18 +38,14 @@ impl Interpreter {
         }
     }
 
-    pub fn look_up_variable(&self, name: &Token, expr: &Variable) -> Object {
+    pub fn look_up_variable(&self, name: &Token, expr: &Variable) -> Result<Object> {
         let locals = self.locals.borrow();
         let distance = locals.get(name);
 
         if let Some(distance) = distance {
-            self.env
-                .borrow()
-                .borrow()
-                .get_at(*distance, &name.lexeme)
-                .unwrap()
+            self.env.borrow().borrow().get_at(*distance, &name.lexeme)
         } else {
-            self._globals.borrow().get(&name.lexeme, name).unwrap()
+            self._globals.borrow().get(&name.lexeme, name)
         }
     }
 
@@ -253,7 +249,7 @@ impl ExprVisitor<FlowResult<Object>> for Interpreter {
     }
 
     fn visit_variable(&self, variable: &super::expr::Variable) -> FlowResult<Object> {
-        ok(self.look_up_variable(&variable.name, variable))
+        ok(self.look_up_variable(&variable.name, variable)?)
     }
 
     fn visit_literal(&self, literal: &Literal) -> FlowResult<Object> {
