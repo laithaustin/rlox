@@ -51,11 +51,21 @@ impl Lox {
             Ok(ast) => {
                 let interpreter = Rc::new(RefCell::new(Interpreter::new()));
                 let mut resolver = Resolver::new(interpreter.clone());
-                match interpreter.borrow_mut().interpret(ast) {
-                    Ok(_) => (),
-                    Err(e) => {
-                        eprintln!("Runtime error: {}", e);
-                        self.had_runtime_error = true;
+
+                // check for resolver errors first
+                resolver.resolve_statements(&ast);
+                if resolver.errors.borrow().len() > 0 {
+                    for error in resolver.errors.borrow().iter() {
+                        eprintln!("Resolver error: {}", error);
+                    }
+                    self.had_error = true;
+                } else {
+                    match interpreter.borrow_mut().interpret(ast) {
+                        Ok(_) => (),
+                        Err(e) => {
+                            eprintln!("Runtime error: {}", e);
+                            self.had_runtime_error = true;
+                        }
                     }
                 }
             }

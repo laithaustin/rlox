@@ -12,10 +12,17 @@ use std::rc::Rc;
 use super::expr::Variable;
 use super::stmt::Function;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FunctionType {
+    NONE,
+    FUNCTION,
+}
+
 pub struct Resolver {
     pub interpreter: Rc<RefCell<Interpreter>>,
     pub scopes: RefCell<Vec<HashMap<String, bool>>>,
     pub errors: RefCell<Vec<LoxError>>,
+    pub current_function: RefCell<FunctionType>,
 }
 
 // Our primary concerns for this semantic analysis are for the following cases:
@@ -40,7 +47,7 @@ impl StmtVisitor<()> for Resolver {
     fn visit_function(&self, function: &super::stmt::Function) -> () {
         self.declare(&function.name);
         self.define(&function.name);
-        self.resolve_function(&function);
+        self.resolve_function(&function, FunctionType::FUNCTION);
     }
 
     fn visit_expression(&self, expression: &super::stmt::Expression) -> () {
@@ -60,6 +67,12 @@ impl StmtVisitor<()> for Resolver {
     }
 
     fn visit_return_stmt(&self, return_stmt: &super::stmt::ReturnStmt) -> () {
+        if *self.current_function.borrow() == FunctionType::NONE {
+            self.errors.borrow_mut().push(LoxError::new_parse(
+                return_stmt.tok.as_ref().clone(),
+                "Cannot return from top level code.",
+            ))
+        }
         self.resolve_expression(&return_stmt.value);
     }
 
@@ -136,7 +149,11 @@ impl Resolver {
         self.scopes.borrow_mut().pop();
     }
 
-    pub fn resolve_function(&self, func: &Function) {
+    pub fn resolve_function(&self, func: &Function, ftype: FunctionType) {
+        // stash our function status - need to traxk when we enter and exit
+        let enclosing_function: FunctionType = self.current_function.borrow().clone();
+        self.current_function.replace(ftype);
+
         self.begin_scope();
         for param in func.parameters.iter() {
             self.declare(param);
@@ -154,6 +171,7 @@ impl Resolver {
         }
 
         self.end_scope();
+        self.current_function.replace(enclosing_function);
     }
 
     pub fn resolve_local(&self, name: &Token) {
@@ -179,7 +197,9 @@ impl Resolver {
         let mut scopes = self.scopes.borrow_mut();
         let current = scopes.last_mut().unwrap();
         if current.contains_key(&var.lexeme) {
-            eprintln!("Variable '{}' already declared in this scope.", var.lexeme);
+            self.errors.borrow_mut().push(LoxError::new_internal(
+                "Already a variable with this name in this scope",
+            ));
         }
         current.insert(var.lexeme.clone(), false);
     }
@@ -221,6 +241,7 @@ impl Resolver {
             interpreter,
             scopes: RefCell::new(Vec::new()),
             errors: RefCell::new(Vec::new()), // aggregate errors as we go
+            current_function: RefCell::new(FunctionType::NONE),
         }
     }
 }
