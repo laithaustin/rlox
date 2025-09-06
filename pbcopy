@@ -1,0 +1,184 @@
+commit 3c1841d638be46e89b941d7e5cad4e3276a270c9
+Author: laithaustin <laithaustin@gmail.com>
+Date:   Fri Sep 5 16:18:42 2025 -0400
+
+    resolver integration into interpreter logic. everything is compiling -
+    just missing some logic
+
+diff --git a/src/compiler/env.rs b/src/compiler/env.rs
+index 2b81bc6..5b9159c 100644
+--- a/src/compiler/env.rs
++++ b/src/compiler/env.rs
+@@ -4,6 +4,7 @@ use crate::compiler::expr::Object;
+ use crate::compiler::token::Token;
+ use std::cell::RefCell;
+ use std::collections::HashMap;
++use std::path::Ancestors;
+ use std::rc::Rc;
+ 
+ pub type EnvRef = Rc<RefCell<Env>>;
+@@ -88,6 +89,26 @@ impl Env {
+         self.bindings.insert(name, value);
+     }
+ 
++    pub fn ancestor(&self, distance: usize) -> Result<EnvRef> {
++        let mut current = self.enclosing.as_ref().unwrap().clone();
++        for _ in 1..distance {
++            let next = current.borrow().enclosing.as_ref().unwrap().clone();
++            current = next;
++        }
++
++        Ok(current)
++    }
++
++    pub fn get_at(&self, distance: usize, name: &str) -> Result<Object> {
++        return Ok(self
++            .ancestor(distance)?
++            .borrow()
++            .bindings
++            .get(name)
++            .ok_or_else(|| LoxError::new_internal(&format!("undefined var: {}", name)))?
++            .clone());
++    }
++
+     pub fn get(&self, name: &String, token: &Token) -> Result<Object> {
+         match self.bindings.get(name) {
+             Some(value) => Ok(value.clone()),
+diff --git a/src/compiler/interpreter.rs b/src/compiler/interpreter.rs
+index 17477e9..0aeee3f 100644
+--- a/src/compiler/interpreter.rs
++++ b/src/compiler/interpreter.rs
+@@ -1,10 +1,9 @@
+-use crate::Expr;
+ use crate::compiler::control_flow::{ControlFlow, FlowResult, extract_value, ok, return_value};
+ use crate::compiler::env::{Env, EnvGuard, EnvRef};
+ use crate::compiler::error::{LoxError, Result};
+ use crate::compiler::expr::ExprVisitor;
+ use crate::compiler::expr::Object;
+-use crate::compiler::expr::{Binary, Grouping, Literal, LoxCallable, Ternary, Unary};
++use crate::compiler::expr::{Binary, Grouping, Literal, LoxCallable, Ternary, Unary, Variable};
+ use crate::compiler::lox_function::LoxFunction;
+ use crate::compiler::natives::ClockFunction;
+ use crate::compiler::stmt::Stmt;
+@@ -18,7 +17,7 @@ pub struct Interpreter {
+     // Interpreter state will go here
+     pub _globals: EnvRef,
+     pub env: RefCell<EnvRef>, // allows for us to mutate the environment by borrowing it mutably
+-    pub locals: RefCell<HashMap<*const Expr, usize>>,
++    pub locals: RefCell<HashMap<Token, usize>>,
+ }
+ 
+ impl Interpreter {
+@@ -39,8 +38,23 @@ impl Interpreter {
+         }
+     }
+ 
+-    pub fn resolve(&mut self, expr: &Expr, depth: usize) {
+-        self.locals.borrow_mut().insert(expr as *const Expr, depth);
++    pub fn look_up_variable(&self, name: &Token, expr: &Variable) -> Object {
++        let locals = self.locals.borrow();
++        let distance = locals.get(name);
++
++        if let Some(distance) = distance {
++            self.env
++                .borrow()
++                .borrow()
++                .get_at(*distance, &name.lexeme)
++                .unwrap()
++        } else {
++            self._globals.borrow().get(&name.lexeme, name).unwrap()
++        }
++    }
++
++    pub fn resolve(&self, expr: &Token, depth: usize) {
++        self.locals.borrow_mut().insert(expr.clone(), depth);
+     }
+ 
+     fn execute(&mut self, statement: &Stmt) -> FlowResult<Object> {
+@@ -224,21 +238,7 @@ impl ExprVisitor<FlowResult<Object>> for Interpreter {
+     }
+ 
+     fn visit_variable(&self, variable: &super::expr::Variable) -> FlowResult<Object> {
+-        match self
+-            .env
+-            .borrow()
+-            .borrow()
+-            .get(&variable.name.lexeme, &variable.name)
+-        {
+-            Ok(obj) => ok(obj),
+-            Err(_) => Err(LoxError::new_runtime(
+-                variable.name.clone(),
+-                &format!(
+-                    "Undefined variable '{}' during visit.",
+-                    variable.name.lexeme
+-                ),
+-            )),
+-        }
++        ok(self.look_up_variable(&variable.name, variable))
+     }
+ 
+     fn visit_literal(&self, literal: &Literal) -> FlowResult<Object> {
+diff --git a/src/compiler/resolver.rs b/src/compiler/resolver.rs
+index 01b1640..553c69a 100644
+--- a/src/compiler/resolver.rs
++++ b/src/compiler/resolver.rs
+@@ -84,7 +84,7 @@ impl ExprVisitor<()> for Resolver {
+                 );
+             }
+         }
+-        self.resolve_local(&Expr::Variable(Box::new(variable.clone())), &variable.name);
++        self.resolve_local(&variable.name);
+     }
+ 
+     fn visit_call(&self, call: &super::expr::Call) -> () {
+@@ -101,10 +101,7 @@ impl ExprVisitor<()> for Resolver {
+ 
+     fn visit_assign(&self, assign: &super::expr::Assign) -> () {
+         self.resolve_expression(&assign.value);
+-
+-        // we need to actually create a variable expression
+-        let var_expr = Expr::Variable(Box::new(assign.name.clone()));
+-        self.resolve_local(&var_expr, &assign.name);
++        self.resolve_local(&assign.name);
+     }
+ 
+     fn visit_logical(&self, logical: &super::expr::Logical) -> () {
+@@ -158,12 +155,12 @@ impl Resolver {
+         self.end_scope();
+     }
+ 
+-    pub fn resolve_local(&self, expr: &Expr, name: &Token) {
++    pub fn resolve_local(&self, name: &Token) {
+         // iterate backwards through scopes to find appropriate variable to resolve
+         for (i, scope) in self.scopes.borrow().iter().enumerate().rev() {
+             if scope.contains_key(&name.lexeme) {
+                 self.interpreter
+-                    .resolve(expr, self.scopes.borrow().len() - i - 1);
++                    .resolve(name, self.scopes.borrow().len() - i - 1);
+                 return;
+             }
+         }
+diff --git a/src/compiler/token.rs b/src/compiler/token.rs
+index 7496bc8..dbf3cb4 100644
+--- a/src/compiler/token.rs
++++ b/src/compiler/token.rs
+@@ -1,8 +1,8 @@
+ use std::fmt;
+ use std::str::FromStr;
+ 
+-// Estalish basic token types for the lexer
+-#[derive(Debug, PartialEq, Clone)]
++// Establish basic token types for the lexer
++#[derive(Debug, PartialEq, Clone, Eq, Hash)]
+ pub enum TokenType {
+     // single char tokens
+     LPAREN,
+@@ -107,7 +107,7 @@ impl FromStr for TokenType {
+ }
+ 
+ // Token Struct
+-#[derive(Debug, Clone)]
++#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+ pub struct Token {
+     pub token_type: TokenType,
+     pub lexeme: String,
