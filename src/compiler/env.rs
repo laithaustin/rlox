@@ -4,6 +4,7 @@ use crate::compiler::expr::Object;
 use crate::compiler::token::Token;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::path::Ancestors;
 use std::rc::Rc;
 
 pub type EnvRef = Rc<RefCell<Env>>;
@@ -86,6 +87,26 @@ impl Env {
 
     pub fn define(&mut self, name: String, value: Object) {
         self.bindings.insert(name, value);
+    }
+
+    pub fn ancestor(&self, distance: usize) -> Result<EnvRef> {
+        let mut current = self.enclosing.as_ref().unwrap().clone();
+        for _ in 1..distance {
+            let next = current.borrow().enclosing.as_ref().unwrap().clone();
+            current = next;
+        }
+
+        Ok(current)
+    }
+
+    pub fn get_at(&self, distance: usize, name: &str) -> Result<Object> {
+        return Ok(self
+            .ancestor(distance)?
+            .borrow()
+            .bindings
+            .get(name)
+            .ok_or_else(|| LoxError::new_internal(&format!("undefined var: {}", name)))?
+            .clone());
     }
 
     pub fn get(&self, name: &String, token: &Token) -> Result<Object> {

@@ -1,10 +1,9 @@
-use crate::Expr;
 use crate::compiler::control_flow::{ControlFlow, FlowResult, extract_value, ok, return_value};
 use crate::compiler::env::{Env, EnvGuard, EnvRef};
 use crate::compiler::error::{LoxError, Result};
 use crate::compiler::expr::ExprVisitor;
 use crate::compiler::expr::Object;
-use crate::compiler::expr::{Binary, Grouping, Literal, LoxCallable, Ternary, Unary};
+use crate::compiler::expr::{Binary, Grouping, Literal, LoxCallable, Ternary, Unary, Variable};
 use crate::compiler::lox_function::LoxFunction;
 use crate::compiler::natives::ClockFunction;
 use crate::compiler::stmt::Stmt;
@@ -18,7 +17,7 @@ pub struct Interpreter {
     // Interpreter state will go here
     pub _globals: EnvRef,
     pub env: RefCell<EnvRef>, // allows for us to mutate the environment by borrowing it mutably
-    pub locals: RefCell<HashMap<*const Expr, usize>>,
+    pub locals: RefCell<HashMap<Token, usize>>,
 }
 
 impl Interpreter {
@@ -39,8 +38,23 @@ impl Interpreter {
         }
     }
 
-    pub fn resolve(&mut self, expr: &Expr, depth: usize) {
-        self.locals.borrow_mut().insert(expr as *const Expr, depth);
+    pub fn look_up_variable(&self, name: &Token, expr: &Variable) -> Object {
+        let locals = self.locals.borrow();
+        let distance = locals.get(name);
+
+        if let Some(distance) = distance {
+            self.env
+                .borrow()
+                .borrow()
+                .get_at(*distance, &name.lexeme)
+                .unwrap()
+        } else {
+            self._globals.borrow().get(&name.lexeme, name).unwrap()
+        }
+    }
+
+    pub fn resolve(&self, expr: &Token, depth: usize) {
+        self.locals.borrow_mut().insert(expr.clone(), depth);
     }
 
     fn execute(&mut self, statement: &Stmt) -> FlowResult<Object> {
@@ -224,21 +238,7 @@ impl ExprVisitor<FlowResult<Object>> for Interpreter {
     }
 
     fn visit_variable(&self, variable: &super::expr::Variable) -> FlowResult<Object> {
-        match self
-            .env
-            .borrow()
-            .borrow()
-            .get(&variable.name.lexeme, &variable.name)
-        {
-            Ok(obj) => ok(obj),
-            Err(_) => Err(LoxError::new_runtime(
-                variable.name.clone(),
-                &format!(
-                    "Undefined variable '{}' during visit.",
-                    variable.name.lexeme
-                ),
-            )),
-        }
+        ok(self.look_up_variable(&variable.name, variable))
     }
 
     fn visit_literal(&self, literal: &Literal) -> FlowResult<Object> {

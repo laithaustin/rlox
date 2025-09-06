@@ -84,7 +84,7 @@ impl ExprVisitor<()> for Resolver {
                 );
             }
         }
-        self.resolve_local(&Expr::Variable(Box::new(variable.clone())), &variable.name);
+        self.resolve_local(&variable.name);
     }
 
     fn visit_call(&self, call: &super::expr::Call) -> () {
@@ -101,10 +101,7 @@ impl ExprVisitor<()> for Resolver {
 
     fn visit_assign(&self, assign: &super::expr::Assign) -> () {
         self.resolve_expression(&assign.value);
-
-        // we need to actually create a variable expression
-        let var_expr = Expr::Variable(Box::new(assign.name.clone()));
-        self.resolve_local(&var_expr, &assign.name);
+        self.resolve_local(&assign.name);
     }
 
     fn visit_logical(&self, logical: &super::expr::Logical) -> () {
@@ -158,12 +155,12 @@ impl Resolver {
         self.end_scope();
     }
 
-    pub fn resolve_local(&self, expr: &Expr, name: &Token) {
+    pub fn resolve_local(&self, name: &Token) {
         // iterate backwards through scopes to find appropriate variable to resolve
         for (i, scope) in self.scopes.borrow().iter().enumerate().rev() {
             if scope.contains_key(&name.lexeme) {
                 self.interpreter
-                    .resolve(expr, self.scopes.borrow().len() - i - 1);
+                    .resolve(name, self.scopes.borrow().len() - i - 1);
                 return;
             }
         }

@@ -2,7 +2,7 @@ use std::fmt;
 use std::str::FromStr;
 
 // Establish basic token types for the lexer
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub enum TokenType {
     // single char tokens
     LPAREN,
@@ -107,7 +107,7 @@ impl FromStr for TokenType {
 }
 
 // Token Struct
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Token {
     pub token_type: TokenType,
     pub lexeme: String,
