@@ -1,7 +1,9 @@
 use crate::common::*;
-use lox::compiler::{ErrorReporter, Interpreter, Parser, Resolver, Scanner};
+use lox::compiler::{Interpreter, Parser, Resolver, Scanner};
 use std::cell::RefCell;
 use std::rc::Rc;
+
+mod unused_variables;
 
 #[test]
 fn test_return_at_top_level() {
