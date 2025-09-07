@@ -40,9 +40,22 @@ fn execute(source: &str) -> (Result<()>, TestErrorReporter) {
     // Resolve first
     resolver.resolve_statements(&statements);
 
-    // Check for resolver errors
-    if !resolver.errors.borrow().is_empty() {
-        let resolver_error = resolver.errors.borrow()[0].clone();
+    // Check for resolver errors (not warnings)
+    let has_real_errors = resolver
+        .errors
+        .borrow()
+        .iter()
+        .any(|e| e.kind != lox::compiler::error::LoxErrorKind::Warning);
+
+    if has_real_errors {
+        // Find the first non-warning error
+        let resolver_error = resolver
+            .errors
+            .borrow()
+            .iter()
+            .find(|e| e.kind != lox::compiler::error::LoxErrorKind::Warning)
+            .cloned()
+            .unwrap();
         return (Err(resolver_error), reporter);
     }
 
@@ -90,6 +103,9 @@ fn test_function_with_parameters() {
 
     let (result, reporter) = execute(source);
     reporter.assert_no_errors();
+    if let Err(e) = &result {
+        eprintln!("Test failed with error: {}", e);
+    }
     assert!(result.is_ok());
 }
 
@@ -104,6 +120,9 @@ fn test_function_with_multiple_parameters() {
 
     let (result, reporter) = execute(source);
     reporter.assert_no_errors();
+    if let Err(e) = &result {
+        eprintln!("Test failed with error: {}", e);
+    }
     assert!(result.is_ok());
 }
 
@@ -201,6 +220,9 @@ fn test_function_with_expressions() {
 
     let (result, reporter) = execute(source);
     reporter.assert_no_errors();
+    if let Err(e) = &result {
+        eprintln!("Test failed with error: {}", e);
+    }
     assert!(result.is_ok());
 }
 
@@ -220,6 +242,9 @@ fn test_function_with_conditionals() {
 
     let (result, reporter) = execute(source);
     reporter.assert_no_errors();
+    if let Err(e) = &result {
+        eprintln!("Test failed with error: {}", e);
+    }
     assert!(result.is_ok());
 }
 
@@ -238,6 +263,9 @@ fn test_function_with_loops() {
 
     let (result, reporter) = execute(source);
     reporter.assert_no_errors();
+    if let Err(e) = &result {
+        eprintln!("Test failed with error: {}", e);
+    }
     assert!(result.is_ok());
 }
 

@@ -103,11 +103,18 @@ var a = "global";
     resolver.resolve_statements(&ast);
 
     // Check that resolver didn't find any errors (this is valid code)
+    // Ignore warnings about unused variables
     let errors = resolver.errors.borrow();
-    if !errors.is_empty() {
+    let has_real_errors = errors
+        .iter()
+        .any(|e| e.kind != lox::compiler::error::LoxErrorKind::Warning);
+    if has_real_errors {
         panic!(
             "Resolver should not have errors for valid closure code, but got: {:?}",
             errors
+                .iter()
+                .filter(|e| e.kind != lox::compiler::error::LoxErrorKind::Warning)
+                .collect::<Vec<_>>()
         );
     }
 
@@ -185,11 +192,18 @@ outer();
     resolver.resolve_statements(&ast);
 
     // Check that resolver didn't find any errors
+    // Ignore warnings about unused variables
     let errors = resolver.errors.borrow();
-    if !errors.is_empty() {
+    let has_real_errors = errors
+        .iter()
+        .any(|e| e.kind != lox::compiler::error::LoxErrorKind::Warning);
+    if has_real_errors {
         panic!(
             "Resolver should not have errors for valid nested function code, but got: {:?}",
             errors
+                .iter()
+                .filter(|e| e.kind != lox::compiler::error::LoxErrorKind::Warning)
+                .collect::<Vec<_>>()
         );
     }
 }

@@ -117,30 +117,29 @@ impl StmtVisitor<()> for Resolver {
 impl ExprVisitor<()> for Resolver {
     fn visit_variable(&self, variable: &Variable) -> () {
         if !self.scopes.borrow().is_empty() {
-            let current_state = self
+            // Check for self-referential initialization in current scope only
+            if let Some(VarState::DECL) = self
                 .scopes
                 .borrow()
                 .last()
                 .unwrap()
                 .get(&variable.name.lexeme)
-                .cloned();
+            {
+                self.error(
+                    &variable.name,
+                    "Can't read local variable in its own initializer.",
+                );
+            }
 
-            match current_state {
-                Some(VarState::DECL) => {
-                    self.error(
-                        &variable.name,
-                        "Can't read local variable in its own initializer.",
-                    );
+            // Mark the variable as used in whichever scope it's defined in
+            let mut scopes = self.scopes.borrow_mut();
+            for scope in scopes.iter_mut().rev() {
+                if let Some(current_state) = scope.get(&variable.name.lexeme).cloned() {
+                    if current_state == VarState::DEF {
+                        scope.insert(variable.name.lexeme.clone(), VarState::USE);
+                    }
+                    break; // Found the variable, stop searching
                 }
-                Some(VarState::DEF) => {
-                    self.scopes
-                        .borrow_mut()
-                        .last_mut()
-                        .unwrap()
-                        .insert(variable.name.lexeme.clone(), VarState::USE);
-                }
-                Some(VarState::USE) => {}
-                None => {}
             }
         }
         self.resolve_local(&variable.name);
@@ -197,16 +196,16 @@ impl Resolver {
                 VarState::DECL => {
                     self.errors
                         .borrow_mut()
-                        .push(LoxError::new_internal(&format!(
-                            "Variable '{}' is declared but not used",
+                        .push(LoxError::new_warning(&format!(
+                            "Variable '{}' is declared but never used",
                             name
                         )));
                 }
                 VarState::DEF => {
                     self.errors
                         .borrow_mut()
-                        .push(LoxError::new_internal(&format!(
-                            "Variable '{}' is defined but not used",
+                        .push(LoxError::new_warning(&format!(
+                            "Variable '{}' is defined but never used",
                             name
                         )));
                 }
@@ -227,15 +226,7 @@ impl Resolver {
         }
 
         // resolve function body
-        match func.body.as_ref() {
-            Stmt::Block(block) => {
-                self.resolve_statements(&block.statements);
-            }
-            _ => {
-                self.resolve_statement(func.body.as_ref());
-            }
-        }
-
+        self.resolve_statement(func.body.as_ref());
         self.end_scope();
         self.current_function.replace(enclosing_function);
     }

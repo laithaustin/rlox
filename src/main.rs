@@ -7,7 +7,7 @@ use std::{
 
 mod compiler;
 
-use compiler::{ErrorReporter, Interpreter, LoxError, Parser, Resolver, Scanner};
+use compiler::{ErrorReporter, Interpreter, LoxError, LoxErrorKind, Parser, Resolver, Scanner};
 
 pub struct Lox {
     had_error: bool,
@@ -54,12 +54,21 @@ impl Lox {
 
                 // check for resolver errors first
                 resolver.resolve_statements(&ast);
-                if resolver.errors.borrow().len() > 0 {
-                    for error in resolver.errors.borrow().iter() {
+
+                // Process resolver errors and warnings
+                let mut has_real_errors = false;
+                for error in resolver.errors.borrow().iter() {
+                    if error.kind != LoxErrorKind::Warning {
                         eprintln!("Resolver error: {}", error);
+                        self.had_error = true;
+                        has_real_errors = true;
+                    } else {
+                        eprintln!("Warning: {}", error);
                     }
-                    self.had_error = true;
-                } else {
+                }
+
+                // Only skip interpretation if there are actual errors (not just warnings)
+                if !has_real_errors {
                     match interpreter.borrow_mut().interpret(ast) {
                         Ok(_) => (),
                         Err(e) => {

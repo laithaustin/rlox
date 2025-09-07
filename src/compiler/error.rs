@@ -2,7 +2,7 @@ use crate::compiler::token::{Token, TokenType};
 use std::fmt;
 
 // Define different error types in our interpreter
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LoxErrorKind {
     // Syntax errors during parsing
     Parse,
@@ -10,6 +10,7 @@ pub enum LoxErrorKind {
     Runtime,
     // General interpreter errors
     Internal,
+    Warning,
 }
 
 #[derive(Debug, Clone)]
@@ -56,6 +57,15 @@ impl LoxError {
             line: None,
         }
     }
+
+    pub fn new_warning(message: &str) -> Self {
+        LoxError {
+            kind: LoxErrorKind::Warning,
+            message: message.to_string(),
+            token: None,
+            line: None,
+        }
+    }
 }
 
 impl fmt::Display for LoxError {
@@ -91,6 +101,9 @@ impl fmt::Display for LoxError {
             }
             LoxErrorKind::Internal => {
                 write!(f, "Internal Error: {}", self.message)
+            }
+            LoxErrorKind::Warning => {
+                write!(f, "Warning: {}", self.message)
             }
         }
     }

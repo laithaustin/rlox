@@ -29,9 +29,22 @@ fn execute(source: &str) -> (Result<()>, TestErrorReporter) {
     // Resolve first
     resolver.resolve_statements(&statements);
 
-    // Check for resolver errors
-    if !resolver.errors.borrow().is_empty() {
-        let resolver_error = resolver.errors.borrow()[0].clone();
+    // Check for resolver errors (not warnings)
+    let has_real_errors = resolver
+        .errors
+        .borrow()
+        .iter()
+        .any(|e| e.kind != lox::compiler::error::LoxErrorKind::Warning);
+
+    if has_real_errors {
+        // Find the first non-warning error
+        let resolver_error = resolver
+            .errors
+            .borrow()
+            .iter()
+            .find(|e| e.kind != lox::compiler::error::LoxErrorKind::Warning)
+            .cloned()
+            .unwrap();
         return (Err(resolver_error), reporter);
     }
 
