@@ -18,9 +18,16 @@ pub enum FunctionType {
     FUNCTION,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VarState {
+    DECL,
+    DEF,
+    USE,
+}
+
 pub struct Resolver {
     pub interpreter: Rc<RefCell<Interpreter>>,
-    pub scopes: RefCell<Vec<HashMap<String, bool>>>,
+    pub scopes: RefCell<Vec<HashMap<String, VarState>>>,
     pub errors: RefCell<Vec<LoxError>>,
     pub current_function: RefCell<FunctionType>,
 }
@@ -110,17 +117,30 @@ impl StmtVisitor<()> for Resolver {
 impl ExprVisitor<()> for Resolver {
     fn visit_variable(&self, variable: &Variable) -> () {
         if !self.scopes.borrow().is_empty() {
-            if let Some(false) = self
+            let current_state = self
                 .scopes
                 .borrow()
                 .last()
                 .unwrap()
                 .get(&variable.name.lexeme)
-            {
-                self.error(
-                    &variable.name,
-                    "Can't read local variable in its own initializer.",
-                );
+                .cloned();
+
+            match current_state {
+                Some(VarState::DECL) => {
+                    self.error(
+                        &variable.name,
+                        "Can't read local variable in its own initializer.",
+                    );
+                }
+                Some(VarState::DEF) => {
+                    self.scopes
+                        .borrow_mut()
+                        .last_mut()
+                        .unwrap()
+                        .insert(variable.name.lexeme.clone(), VarState::USE);
+                }
+                Some(VarState::USE) => {}
+                None => {}
             }
         }
         self.resolve_local(&variable.name);
@@ -171,7 +191,28 @@ impl Resolver {
     }
 
     pub fn end_scope(&self) {
-        self.scopes.borrow_mut().pop();
+        // iterate through current scope and check for variable that are decl or def
+        for (name, kind) in self.scopes.borrow_mut().pop().unwrap().iter() {
+            match kind {
+                VarState::DECL => {
+                    self.errors
+                        .borrow_mut()
+                        .push(LoxError::new_internal(&format!(
+                            "Variable '{}' is declared but not used",
+                            name
+                        )));
+                }
+                VarState::DEF => {
+                    self.errors
+                        .borrow_mut()
+                        .push(LoxError::new_internal(&format!(
+                            "Variable '{}' is defined but not used",
+                            name
+                        )));
+                }
+                VarState::USE => {}
+            }
+        }
     }
 
     pub fn resolve_function(&self, func: &Function) {
@@ -226,7 +267,7 @@ impl Resolver {
                 "Already a variable with this name in this scope",
             ));
         }
-        current.insert(var.lexeme.clone(), false);
+        current.insert(var.lexeme.clone(), VarState::DECL);
     }
 
     pub fn define(&self, var: &Token) {
@@ -234,11 +275,16 @@ impl Resolver {
             return;
         }
 
-        self.scopes
-            .borrow_mut()
-            .last_mut()
-            .unwrap()
-            .insert(var.lexeme.clone(), true);
+        if let Some(scope) = self.scopes.borrow_mut().last_mut() {
+            // Only update to DEF if not already USE
+            if let Some(&current_state) = scope.get(&var.lexeme) {
+                if current_state != VarState::USE {
+                    scope.insert(var.lexeme.clone(), VarState::DEF);
+                }
+            } else {
+                scope.insert(var.lexeme.clone(), VarState::DEF);
+            }
+        }
     }
 
     pub fn resolve_statements(&self, statements: &[Stmt]) {
