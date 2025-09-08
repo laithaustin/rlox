@@ -225,8 +225,17 @@ impl Resolver {
             self.define(param);
         }
 
-        // resolve function body
-        self.resolve_statement(func.body.as_ref());
+        // resolve function body - since it's always a Block, resolve its statements directly
+        // instead of creating another scope
+        match func.body.as_ref() {
+            crate::compiler::stmt::Stmt::Block(block) => {
+                self.resolve_statements(&block.statements);
+            }
+            _ => {
+                // If it's not a block (shouldn't happen), resolve it normally
+                self.resolve_statement(func.body.as_ref());
+            }
+        }
         self.end_scope();
         self.current_function.replace(enclosing_function);
     }
