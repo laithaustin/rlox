@@ -4,6 +4,7 @@ use crate::compiler::error::{LoxError, Result};
 use crate::compiler::expr::ExprVisitor;
 use crate::compiler::expr::Object;
 use crate::compiler::expr::{Binary, Grouping, Literal, LoxCallable, Ternary, Unary, Variable};
+use crate::compiler::lox_class::LoxClass;
 use crate::compiler::lox_function::LoxFunction;
 use crate::compiler::natives::ClockFunction;
 use crate::compiler::stmt::Stmt;
@@ -94,6 +95,22 @@ impl Interpreter {
 }
 
 impl StmtVisitor<FlowResult<Object>> for Interpreter {
+    fn visit_class(&self, class: &super::stmt::Class) -> FlowResult<Object> {
+        self.env
+            .borrow()
+            .borrow_mut()
+            .define(class.name.lexeme.clone(), Object::Nil);
+        let lox_class = LoxClass {
+            name: class.name.lexeme.clone(),
+        };
+        let class_obj = Object::Class(Rc::new(lox_class));
+        self.env
+            .borrow()
+            .borrow_mut()
+            .define(class.name.lexeme.clone(), class_obj);
+        ok(Object::Nil)
+    }
+
     fn visit_return_stmt(&self, return_stmt: &super::stmt::ReturnStmt) -> FlowResult<Object> {
         // critical point where we have a different return type
         return_value(return_stmt.value.accept(self)?.0)
@@ -259,6 +276,7 @@ impl ExprVisitor<FlowResult<Object>> for Interpreter {
             Object::Boolean(b) => ok(Object::Boolean(b)),
             Object::Nil => ok(Object::Nil),
             Object::Function(ref f) => ok(Object::Function(f.clone())),
+            Object::Class(ref c) => ok(Object::Class(c.clone())),
             // Use a dummy token since Literal has no operator
             Object::Error(ref msg) => {
                 use crate::compiler::token::{Token, TokenType};

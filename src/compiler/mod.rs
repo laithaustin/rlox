@@ -4,6 +4,7 @@ pub mod env;
 pub mod error;
 pub mod expr;
 pub mod interpreter;
+pub mod lox_class;
 pub mod lox_function;
 pub mod natives;
 pub mod parser;

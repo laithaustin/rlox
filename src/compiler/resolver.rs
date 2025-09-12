@@ -39,6 +39,11 @@ pub struct Resolver {
 // 4. Function declarations add a new scope for the body and params
 
 impl StmtVisitor<()> for Resolver {
+    fn visit_class(&self, class: &super::stmt::Class) -> () {
+        self.declare(&class.name);
+        self.define(&class.name);
+    }
+
     fn visit_block(&self, block: &super::stmt::Block) -> () {
         self.begin_scope();
         self.resolve_statements(&block.statements);

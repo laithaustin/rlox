@@ -2,16 +2,17 @@ use crate::compiler::expr::{
     Assign, Binary, Call, Expr, Grouping, Literal, Logical, Object, Ternary, Unary, Variable,
 };
 use crate::compiler::stmt::{
-    Block, Expression, Function, IfStmt, Print, ReturnStmt, Stmt, Var, WhileStmt,
+    Block, Class, Expression, Function, IfStmt, Print, ReturnStmt, Stmt, Var, WhileStmt,
 };
 use crate::compiler::token::TokenType;
 use crate::compiler::{LoxError, Result, Token};
 
 // The essential grammar for lox is as follows (low to high precedence):
 // program -> declaration* EOF
-// declaration -> varStmt | statement
+// declaration -> varStmt | funStmt | classDev | statement
 // varStmt -> "var" identifier ("=" expression)? ";"
 // statement -> printStmt | exprStmt | whileStmt | forStmt | ifStmt | block | funcStmt | returnStmt
+// classDec -> "class" identifier "{" function* "}" ;
 // funcStmt -> "func" function;
 // returnStmt -> "return" expression? ";"
 // function -> Identifier "(" parameters? ")" block;
@@ -72,6 +73,22 @@ impl Parser {
 
     pub fn fun_statement(&mut self) -> Result<Stmt> {
         self.function()
+    }
+
+    pub fn class(&mut self) -> Result<Stmt> {
+        let name = self
+            .consume(&TokenType::IDENTIFIER, "Expect class name.")?
+            .clone();
+        self.consume(&TokenType::LBRACE, "Expected left brace.")?;
+        let mut methods: Vec<Stmt> = Vec::new();
+        while !self.is_at_end() && !self.check(&TokenType::RBRACE) {
+            methods.push(self.function()?);
+        }
+        self.consume(&TokenType::RBRACE, "Expected right brace after class body.")?;
+        Ok(Stmt::Class(Box::new(Class {
+            name: Box::new(name),
+            methods: methods,
+        })))
     }
 
     pub fn function(&mut self) -> Result<Stmt> {
@@ -272,6 +289,9 @@ impl Parser {
     pub fn declaration(&mut self) -> Result<Stmt> {
         if self.match_token(&[TokenType::FUN]) {
             return self.function();
+        }
+        if self.match_token(&[TokenType::CLASS]) {
+            return self.class();
         }
         if self.match_token(&[TokenType::VAR]) {
             return self.var_declar();

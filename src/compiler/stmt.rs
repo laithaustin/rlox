@@ -11,6 +11,7 @@ pub enum Stmt {
     IfStmt(Box<IfStmt>),
     WhileStmt(Box<WhileStmt>),
     Function(Box<Function>),
+    Class(Box<Class>),
     ReturnStmt(Box<ReturnStmt>),
 }
 
@@ -22,6 +23,7 @@ pub trait StmtVisitor<T> {
     fn visit_if_stmt(&self, if_stmt: &IfStmt) -> T;
     fn visit_while_stmt(&self, while_stmt: &WhileStmt) -> T;
     fn visit_function(&self, function: &Function) -> T;
+    fn visit_class(&self, class: &Class) -> T;
     fn visit_return_stmt(&self, return_stmt: &ReturnStmt) -> T;
 }
 
@@ -35,6 +37,7 @@ impl Stmt {
             Stmt::IfStmt(b) => visitor.visit_if_stmt(b),
             Stmt::WhileStmt(b) => visitor.visit_while_stmt(b),
             Stmt::Function(b) => visitor.visit_function(b),
+            Stmt::Class(b) => visitor.visit_class(b),
             Stmt::ReturnStmt(b) => visitor.visit_return_stmt(b),
         }
     }
@@ -79,6 +82,12 @@ pub struct Function {
     pub name: Box<Token>,
     pub parameters: Box<Vec<Token>>,
     pub body: Box<Stmt>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Class {
+    pub name: Box<Token>,
+    pub methods: Vec<Stmt>,
 }
 
 #[derive(Debug, Clone)]
