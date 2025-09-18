@@ -215,6 +215,7 @@ impl ExprVisitor<FlowResult<Object>> for Interpreter {
                 }
                 ok(function.call(self, &args)?)
             }
+            Object::Class(class) => ok(class.call(self, &args)?),
             _ => Err(LoxError::new_runtime(
                 call.paren.clone(),
                 "Can only call functions.",
@@ -277,6 +278,7 @@ impl ExprVisitor<FlowResult<Object>> for Interpreter {
             Object::Nil => ok(Object::Nil),
             Object::Function(ref f) => ok(Object::Function(f.clone())),
             Object::Class(ref c) => ok(Object::Class(c.clone())),
+            Object::Instance(ref i) => ok(Object::Instance(i.clone())),
             // Use a dummy token since Literal has no operator
             Object::Error(ref msg) => {
                 use crate::compiler::token::{Token, TokenType};

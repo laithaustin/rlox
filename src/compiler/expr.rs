@@ -1,6 +1,7 @@
 use crate::compiler::Result;
 use crate::compiler::interpreter::Interpreter;
 use crate::compiler::lox_class::LoxClass;
+use crate::compiler::lox_instance::LoxInstance;
 use crate::compiler::token::Token;
 use std::fmt;
 use std::rc::Rc;
@@ -15,6 +16,7 @@ pub enum Object {
     Error(String),
     Function(Rc<dyn LoxCallable>),
     Class(Rc<LoxClass>),
+    Instance(Rc<LoxInstance>),
 }
 
 impl PartialEq for Object {
@@ -27,6 +29,8 @@ impl PartialEq for Object {
             (Object::Error(a), Object::Error(b)) => a == b,
             // Functions are only equal if they're the same reference
             (Object::Function(a), Object::Function(b)) => Rc::ptr_eq(a, b),
+            (Object::Class(a), Object::Class(b)) => Rc::ptr_eq(a, b),
+            (Object::Instance(a), Object::Instance(b)) => Rc::ptr_eq(a, b),
             _ => false,
         }
     }
@@ -42,6 +46,7 @@ impl fmt::Display for Object {
             Object::Error(e) => write!(f, "Error: {}", e),
             Object::Function(func) => write!(f, "{}", func.to_string()),
             Object::Class(class) => write!(f, "{:?}", class),
+            Object::Instance(instance) => write!(f, "{:?}", instance),
         }
     }
 }

@@ -56,17 +56,20 @@ impl StmtVisitor<()> for Resolver {
         let was_global = self.scopes.borrow().is_empty();
 
         if was_global {
-            // Create temporary scope for global variable self-reference detection
-            self.begin_scope();
-        }
-
-        self.declare(&var.name);
-        self.resolve_expression(&var.initializer);
-        self.define(&var.name);
-
-        if was_global {
-            // Remove temporary scope
-            self.end_scope();
+            // Check for self reference without creating scopes
+            if let Expr::Variable(name) = &var.initializer.as_ref() {
+                if name.name.lexeme == var.name.lexeme {
+                    self.error(
+                        &var.name,
+                        "Can't read local variable in its own initializer.",
+                    );
+                }
+            }
+            self.resolve_expression(&var.initializer);
+        } else {
+            self.declare(&var.name);
+            self.resolve_expression(&var.initializer);
+            self.define(&var.name);
         }
     }
 
@@ -121,24 +124,29 @@ impl StmtVisitor<()> for Resolver {
 
 impl ExprVisitor<()> for Resolver {
     fn visit_variable(&self, variable: &Variable) -> () {
-        if !self.scopes.borrow().is_empty() {
-            // Check for self-referential initialization in current scope only
-            if let Some(VarState::DECL) = self
-                .scopes
-                .borrow()
-                .last()
-                .unwrap()
-                .get(&variable.name.lexeme)
-            {
-                self.error(
-                    &variable.name,
-                    "Can't read local variable in its own initializer.",
-                );
+        println!("Visiting variable: {}", variable.name.lexeme);
+        // Check for self-referential initialization in current scope only
+        let has_self_ref = {
+            let scopes = self.scopes.borrow();
+            if !scopes.is_empty() {
+                scopes.last().unwrap().get(&variable.name.lexeme) == Some(&VarState::DECL)
+            } else {
+                false
             }
+        };
 
-            // Mark the variable as used in whichever scope it's defined in
+        if has_self_ref {
+            self.error(
+                &variable.name,
+                "Can't read local variable in its own initializer.",
+            );
+        }
+
+        {
             let mut scopes = self.scopes.borrow_mut();
+            // Mark the variable as used in whichever scope it's defined in
             for scope in scopes.iter_mut().rev() {
+                println!("Checking scope: {:?}", scope);
                 if let Some(current_state) = scope.get(&variable.name.lexeme).cloned() {
                     if current_state == VarState::DEF {
                         scope.insert(variable.name.lexeme.clone(), VarState::USE);
@@ -147,6 +155,7 @@ impl ExprVisitor<()> for Resolver {
                 }
             }
         }
+
         self.resolve_local(&variable.name);
     }
 
